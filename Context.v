@@ -245,6 +245,7 @@ Ltac simpl_args f :=
 
 Ltac reification_wrt :=
   match goal with
+  | [ |- interp_list None = interp_list None ] => reflexivity
   | [ |- interp_list (Some ?ls1) = interp_list (Some ?ls2) ] =>
     let idx1 := reify_wrt ls1 ls1 in
     let idx2 := reify_wrt ls1 ls2 in
@@ -273,6 +274,7 @@ Ltac reification :=
                         apply meq_multiplicity; intros; destruct_finite_In
   end.
 (* This doesn't account for EVARs yet *)
+(* Also not sure if it says anything about the nilpotent part... *)
 
 
 Example NCM_comm' : forall (a b : A), a · b = b · a.
@@ -280,7 +282,16 @@ Proof.
   intros. reification. 
 Defined.
 
+Example NCM_unit' : forall a, 1 · a = a.
+Proof. intros. reification. Defined.
+
+
+Example NCM_absorb' : forall a, 0 · a = 0.
+Proof. intros; reification. Defined.
+
+
 End NCM.
+
 
 
 
@@ -306,7 +317,6 @@ Definition interp_list {A} `{Nilpotent_Commutative_Monoid A}
   | None => zero
   | Some ls => interp_list' ls values
   end.
-
 Lemma flatten_correct : forall e, interp_NCM e = interp_list (flatten e).
 
 
