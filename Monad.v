@@ -1,4 +1,7 @@
 Set Implicit Arguments.
+Require Import List.
+(*Require Import HoTT.*)
+
 
 (** * The Functor Type Class *)
 
@@ -67,6 +70,46 @@ Notation "a >> f" := (wbind _ a f) (at level 50, left associativity).
 Notation "'do' a ← e ; c" := (e >>= (fun  a => c)) (at level 60, right associativity).
 
 (** * Some classic Monads *)
+
+(** ** The list monad *)
+
+Open Scope list_scope. 
+Definition list_fmap {A B} (f : A -> B) := 
+  fix map (l : list A) : list B :=
+  match l with
+  | nil => nil
+  | a :: t => f a :: map t
+  end.
+(*
+Fixpoint list_fmap {A B} (f : A -> B) (ls : list A) : list B :=
+  match ls with
+  | nil => nil
+  | a :: ls' => f a :: list_fmap f ls'
+  end.  *)
+
+Fixpoint concat {A} (xs : list (list A)) : list A :=
+  match xs with
+  | nil => nil
+  | ys :: xs' => ys ++ concat xs'
+  end.
+
+Definition list_liftA {A B} (fs : list (A -> B)) (xs : list A) : list B :=
+  let g := fun a => list_fmap (fun f => f a) fs
+  in
+  concat (list_fmap g xs).
+
+Fixpoint list_bind {A} (xs : list A) {B} (f : A -> list B) : list B :=
+  match xs with
+  | nil => nil
+  | a :: xs' => f a ++ list_bind xs' f
+  end.
+
+Instance listF : Functor list := { fmap := @list_fmap }.
+Instance listA : Applicative list := { pure := fun _ x => x :: nil
+                                     ; liftA := @list_liftA }.
+Instance listM : Monad list := 
+  { bind := @list_bind }.
+
 (** ** The Maybe monad (using option type) *) 
 
 Definition option_fmap {A B} (f : A -> B) (x : option A) : option B :=

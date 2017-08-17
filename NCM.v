@@ -1,48 +1,46 @@
 Require Import Monad.
 Require Import PermutSetoid.
 Require Import Sorting.Permutation.
-Require Import Sorting.PermutEq. (* Standard library *)  About permutation. 
-                                                         About permut_In_In. 
-                                                         About Permutation.
+Require Import Sorting.PermutEq. (* Standard library *)  
 
 
-Section NCM.
-  Variable A : Type.
-  Variable zero : A.
-  Variable one : A.
-  Variable m : A -> A -> A.
-
-(*  
-
-Class Nilpotent_Commutative_Monoid A := 
+Class NCM A :=
     { zero : A
     ; one  : A
-    ; m    : A -> A -> A }. *)
+    ; m    : A -> A -> A }.
 Notation "0" := zero.
 Notation "1" := one.
 Notation "a · b" := (m a b) (right associativity, at level 20).
 
-(* I care about the NCM laws up to a certain equivalence relation, 
-   at least in the case of lists. That means I either want to paramaterize
-   the NCM_Laws type class with an (equivalence) relation, or we want to
-   consider a HIT to do that. That's quite annoying... 
-   Maybe we don't actually want the laws for a list, but always be talking in
-   terms of its interpretation...
- *)
 
+Class NCM_Laws A `{NCM A} :=
+  { NCM_unit  : forall a, a · 1 = a
+  ; NCM_assoc : forall a b c, a · (b · c) = (a · b) · c
+  ; NCM_absorb: forall a, a · 0 = 0
+  ; NCM_comm  : forall a b, a · b = b · a
+  ; NCM_nilpotent : forall a, a = 1 \/ a · a = 0 }.
+Hint Resolve NCM_unit NCM_absorb.
+
+Set Implicit Arguments.
+
+
+(****************************)
+(* Interpretable type class *)
+(****************************)
+
+Class Interpretable (A B : Type) := { interp : B -> A }.
+Notation "[ b ]" := (interp b).
+
+
+Section NCM.
+  Variable A : Type.
 (*
-Class NCM_Laws :=
-  { m_unit  : forall a, a · 1 = a
-  ; m_assoc : forall a b c, a · (b · c) = (a · b) · c
-  ; m_absorb: forall a, a · 0 = 0
-  ; m_comm  : forall a b, a · b = b · a
-  ; m_nilpotent : forall a, a = 1 \/ a · a = 0 }.
+  Variable zero : A.
+  Variable one : A.
+  Variable m : A -> A -> A. 
 *)
-Hypothesis NCM_unit : forall a, a · 1 = a.
-Hypothesis NCM_assoc : forall a b c, a · (b · c) = (a · b) · c.
-Hypothesis NCM_absorb : forall a, a · 0 = 0.
-Hypothesis NCM_comm : forall a b, a · b = b · a.
-Hypothesis NCM_nilpotent : forall a, a = 1 \/ a · a = 0.
+  Variable NCM_A : `{NCM A}.
+  Variable NCM_A_Laws : `{NCM_Laws A}.
 
 Lemma NCM_unit_l : forall a, 1 · a = a.
 Proof. intros. rewrite NCM_comm. auto. Defined.
@@ -57,70 +55,62 @@ Proof.
   reflexivity.
 Defined.
 
+
 (****************************)
 (* Interpretable type class *)
 (****************************)
 
-Require Import List.
 Open Scope list_scope.
 
+Global Instance Interp_A : Interpretable A A := {interp := fun x => x}.
 
-Class Interpretable (B : Type) := { interp : B -> A }.
-Notation "[ b ]" := (interp b).
-
-Instance Interp_A : Interpretable A := {interp := fun x => x}.
-
-Definition interp_option {B} `{Interpretable B} (o : option B) :=
+Definition interp_option {B} `{Interpretable A B} (o : option B) : A :=
   match o with
   | Some b => [b]
   | None => 0
   end.
-Instance Interp_option (B : Type) `{Interpretable B} : Interpretable (option B) :=
+Global Instance Interp_option (B : Type) `{Interpretable A B} : Interpretable A (option B) :=
   { interp := interp_option }.
 
-Fixpoint interp_list {B} `{Interpretable B} (ls : list B) :=
+Fixpoint interp_list {B} `{Interpretable A B} (ls : list B) :=
   match ls with
   | nil => 1
   | b :: ls' => [b] · interp_list ls'
   end.
-Instance Interp_list (B : Type) `{Interpretable B} : Interpretable (list B) :=
+Global Instance Interp_list (B : Type) `{Interpretable A B} : Interpretable A (list B) :=
   { interp := interp_list }.
+
+
+
+
 
 (***************************************)
 (* Structural representation of an NCM *)
 (***************************************)
 
-Inductive NCM :=
-| NCM_zero : NCM
-| NCM_one  : NCM
-| NCM_var  : A -> NCM
-| NCM_m    : NCM -> NCM -> NCM.
+Inductive NCM_exp :=
+| NCM_zero : NCM_exp
+| NCM_one  : NCM_exp
+| NCM_var  : A -> NCM_exp
+| NCM_m    : NCM_exp -> NCM_exp -> NCM_exp.
 
 
-Fixpoint interp_NCM (e : NCM) : A :=
+Fixpoint interp_NCM (e : NCM_exp) : A :=
   match e with
   | NCM_zero => 0
   | NCM_one => 1
   | NCM_var a => a
   | NCM_m e1 e2 => interp_NCM e1 · interp_NCM e2
   end.
-Instance Interp_NCM : Interpretable NCM := {interp := interp_NCM}.
+Global Instance Interp_NCM : Interpretable A NCM_exp := {interp := interp_NCM}.
 
-Ltac reify a :=
-  match a with
-  | 0 => NCM_zero
-  | 1 => NCM_one
-  | ?a1 · ?a2 => let e1 := reify a1 in
-                 let e2 := reify a2 in
-                 constr:(NCM_m e1 e2)
-  | _ => constr:(NCM_var a)
-  end.
+
 
 (****************)
 (* lists of A's *)
 (****************)
 
-Fixpoint flatten (e : NCM) : option (list A) :=
+Fixpoint flatten (e : NCM_exp) : option (list A) :=
   match e with
   | NCM_zero => None
   | NCM_one  => Some nil
@@ -144,11 +134,10 @@ Defined.
 Lemma flatten_correct : forall e, [e] = [flatten e].
 Proof.
   intros. unfold interp; simpl.
-  induction e; simpl; auto.
+  induction e; simpl; try rewrite NCM_unit; auto. 
   rewrite IHe1, IHe2.
   destruct (flatten e1) as [ ls1 | ] eqn:H1; auto.
-  destruct (flatten e2) as [ ls2 | ] eqn:H2; auto.
-  simpl.
+  destruct (flatten e2) as [ ls2 | ] eqn:H2; simpl; auto.
   apply flatten_correct'.
 Defined.
 
@@ -173,32 +162,16 @@ Fixpoint index (xs : list A) (n : nat) : option A :=
   | (_ :: xs), S x => index xs x
   end.
 
-Definition index_wrt (values : list A) (indices : list nat) : list A :=
-  map (fun i => [index values i]) indices.
-Instance Interp_nat_list : Interpretable (list A * list nat) :=
+Fixpoint index_wrt (values : list A) (indices : list nat) : list A :=
+  match indices with
+  | nil => nil
+  | i :: indices' => [index values i] :: index_wrt values indices'
+  end.
+
+Instance Interp_nat_list : Interpretable A (list A * list nat) :=
   { interp := fun x => match x with
                        | (values, idx) => [index_wrt values idx]
                        end }.
-
-Ltac lookup x xs :=
-  match xs with
-    | x :: _ => O
-    | _ :: ?xs' =>
-        let n := lookup x xs' in
-        constr:(S n)
-  end.
-
-
-(* reify_wrt values ls returns a list of indices idx so that
-   interp_list_nat' values idx = ls
-*)
-Ltac reify_wrt values ls :=
-  match ls with
-  | nil => constr:(@nil nat)
-  | ?a :: ?ls' => let i := lookup a values in
-                  let idx := reify_wrt values ls' in
-                  constr:(i :: idx)
-  end.
 
 
 (* Default list_nat representation of a value *)
@@ -206,14 +179,17 @@ Ltac reify_wrt values ls :=
 Fixpoint nats_lt n : list nat :=
   match n with
   | O => nil
-  | S n' => O :: map S (nats_lt n')
+  | S n' => O :: fmap S (nats_lt n')
   end.
+Require Import List.
+Print map. Print list_fmap.
 
 Lemma index_wrt_cons : forall idx a values,
-      index_wrt (a :: values) (map S idx) = index_wrt values idx.
+      index_wrt (a :: values) (fmap S idx) = index_wrt values idx.
 Proof. 
   induction idx as [ | n]; intros a values; auto.
-  simpl. rewrite IHidx; auto.
+  simpl. 
+  rewrite IHidx; auto.
 Defined.
 
 Lemma index_wrt_default : forall ls, 
@@ -366,12 +342,6 @@ Fixpoint find_duplicate (ls : list nat) : option nat :=
                 else find_duplicate ls'
   end.
 
-(* Also want an Ltac version *)
-Ltac find_duplicate ls :=
-  match ls with
-  | ?n :: ?ls' => let z := lookup n ls' in n
-  | _ :: ?ls' => find_duplicate ls'
-  end.
 
 
 Require Import List.
@@ -423,20 +393,59 @@ Proof.
     destruct (index values j) as [a | ] eqn:H_a; [ | apply NCM_absorb_l].
     (* if j occurs in idx, then we can apply in_nilpotent. *)
      assert (H_a' : [index values j] = a) by (rewrite H_a; auto).
-     destruct (in_index j a values H_a') eqn:H'; auto;
+     destruct (in_index j values H_a') eqn:H'; auto;
      [ rewrite e; simpl; apply NCM_absorb_l | ].
     destruct (in_dec Nat.eq_dec j idx) as [H | H].
     * apply in_nilpotent; [ apply (in_interp_nat j); auto | ].
-      apply (forall_in (fun x => x <> 1) values); auto. 
+      apply (@forall_in _ (fun x => x <> 1) values); auto. 
     * simpl; rewrite IHidx; auto.
       destruct (find_duplicate idx) as [k | ].
       + exists k; auto.
       + inversion pf_dup.
 Defined.      
 
+End NCM.
+About NCM_unit_l.
+(* TODO: We need to get the implicit arguments better. In this case, since
+  NCM_unit_l doesn't actually use the NCM_Laws in the type (or maybe for another
+  reason) it does not treat it as an implicit type. For now we can do it
+  manually, but that's really annoying.
+*)
+
+Arguments NCM_unit_l {A} {NCM_A} {NCM_laws} : rename. 
+About NCM_unit_l.
+
 (***************************)
 (* Putting it all together *)
 (***************************)
+
+
+Ltac lookup x xs :=
+  match xs with
+    | x :: _ => O
+    | _ :: ?xs' =>
+        let n := lookup x xs' in
+        constr:(S n)
+  end.
+
+(* Also want an Ltac version *)
+Ltac find_duplicate ls :=
+  match ls with
+  | ?n :: ?ls' => let z := lookup n ls' in n
+  | _ :: ?ls' => find_duplicate ls'
+  end.
+
+
+Ltac reify a :=
+  match a with
+  | 0 => NCM_zero
+  | 1 => NCM_one
+  | ?a1 · ?a2 => let e1 := reify a1 in
+                 let e2 := reify a2 in
+                 constr:(NCM_m e1 e2)
+  | _ => constr:(NCM_var a)
+  end.
+
 
 Ltac simpl_args :=
   match goal with
@@ -446,6 +455,19 @@ Ltac simpl_args :=
                           rewrite H1, H2 in *; clear x1 x2 H1 H2
   end.
 
+
+
+
+(* reify_wrt values ls returns a list of indices idx so that
+   interp_list_nat' values idx = ls
+*)
+Ltac reify_wrt values ls :=
+  match ls with
+  | nil => constr:(@nil nat)
+  | ?a :: ?ls' => let i := lookup a values in
+                  let idx := reify_wrt values ls' in
+                  constr:(i :: idx)
+  end.
 
 
 
@@ -477,12 +499,13 @@ Ltac destruct_finite_In :=
 
 Ltac prep_reification := 
   match goal with
-  | [ |- ?a1 = ?a2 ] => let e1 := reify a1 in
-                        let e2 := reify a2 in
-                        change ([e1] = [e2]);
-                        repeat rewrite flatten_correct; 
-                        simpl_args;
-                        reification_wrt
+  | [ _ : NCM ?A |- ?a1 = ?a2 ] => 
+    let e1 := reify a1 in
+    let e2 := reify a2 in
+    change (([e1] : A) = ([e2] : A));
+    repeat rewrite flatten_correct; auto;
+    simpl_args;
+    reification_wrt
   end.
 
 Ltac solve_reification :=
@@ -502,9 +525,23 @@ Ltac reification := prep_reification; solve_reification.
 (* This doesn't account for EVARs yet *)
 
 
+Section Examples.
+Variable A : Type.
+Variable NCM_A : `{NCM A}.
+Variable NCM_A_Laws : `{NCM_Laws A}.
+
 Example NCM_comm' : forall (a b : A), a · b = b · a.
 Proof.
-  intros. reification.
+  intros.
+    let e1 := reify (a · b) in 
+    let e2 := reify (b · a) in
+    change (([e1] : A) = [e2]).
+    repeat rewrite flatten_correct; auto.
+    simpl_args.
+index_wrt ls1 idx1
+    reification_wrt.
+
+reification.
 Defined.
 
 Example NCM_unit' : forall a, 1 · a = a.
@@ -519,8 +556,7 @@ Proof.
   intros. reification.
 Defined.
 
-End NCM.
-
+End Examples.
 
 
 
