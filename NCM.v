@@ -4,6 +4,7 @@ Require Import Sorting.Permutation.
 Require Import Sorting.PermutEq. (* Standard library *)  
 
 
+(* Nilpotent Commutative Monoid *)
 Class NCM A :=
     { zero : A
     ; one  : A
@@ -303,36 +304,6 @@ Proof.
 Defined.
 
 
-(* Instead of using multiplicity, use a special operation intended to check for duplicates *)
-
-(*
-Lemma duplicate_nilpotent' : forall values idx i,
-      index values i <> 1 ->
-      multiplicity (contents idx) i > 1 ->
-      interp_list' (interp_list_nat' values idx) = 0.
-Proof.
-  induction idx; intros i H_i H_multiplicity.
-  - simpl in H_multiplicity. inversion H_multiplicity.
-  - simpl in H_multiplicity. destruct (Nat.eq_dec a i) eqn:H_a_i; simpl in *.
-    * subst. 
-      apply gt_S_n in H_multiplicity.
-      apply multiplicity_In in H_multiplicity.
-      apply in_nilpotent; auto.
-      apply in_interp_nat. auto.
-    * rewrite (IHidx i); auto.
-Defined.
-
-Lemma duplicate_nilpotent : forall values idx i,
-      index values i <> 1 ->
-      multiplicity (contents idx) i > 1 ->
-      interp_list_nat values (Some idx) = 0.
-Proof.
-  intros. unfold interp_list_nat; simpl. apply (duplicate_nilpotent' _ _ i); auto.
-Qed.
-*)
-
-About in_dec.
-
 (* find the value of the first duplicated value in the list *)
 Fixpoint find_duplicate (ls : list nat) : option nat :=
   match ls with
@@ -380,6 +351,18 @@ Proof.
     * apply IHidx; auto.
 Defined.
 
+Search (False -> _).
+Lemma option_contradiction : forall {B C} {b : B}, Some b = None -> C.
+Proof. 
+  intros B C b H.
+  set (P := fun (e : option B) => match e with
+                                  | Some _ => True
+                                  | None => False
+                                  end).
+  set (X := (eq_ind (Some b) P I None H : False)).
+  exact (False_rect C X).
+Defined.
+
 Lemma duplicate_nilpotent : forall values idx,
       Forall base values ->
       (exists i, find_duplicate idx = Some i) ->
@@ -387,7 +370,7 @@ Lemma duplicate_nilpotent : forall values idx,
 Proof.
   intros values idx pf_forall.
   induction idx as [ | j idx]; intros [i pf_dup]; simpl in *.
-  - inversion pf_dup.
+  - apply (option_contradiction (eq_sym pf_dup)).
   - change ([index values j] · [index_wrt values idx] = 0).
     destruct (index values j) as [a | ] eqn:H_a; [ | apply NCM_absorb_l].
     (* if j occurs in idx, then we can apply in_nilpotent. *)
@@ -400,7 +383,7 @@ Proof.
     * simpl; rewrite IHidx; auto.
       destruct (find_duplicate idx) as [k | ].
       + exists k; auto.
-      + inversion pf_dup.
+      + apply (option_contradiction (eq_sym pf_dup)).
 Defined.      
 
 End NCM.
@@ -498,8 +481,10 @@ Ltac reification_wrt :=
 Ltac destruct_finite_In :=
   repeat match goal with
   | [ H : In _ _ \/ In _ _ |- _ ] => destruct H
-  | [ H : In ?a _ |- _ ] => inversion H; try (subst; reflexivity)
+  | [ H : In _ nil |- _ ] => apply (False_rect _ H)
+  | [ H : In ?a (_ :: _) |- _ ] => destruct H; try (subst; reflexivity)
   end.
+
 
 Close Scope nat_scope.
 
@@ -552,7 +537,7 @@ Variable NCM_A_Laws : `{NCM_Laws A}.
 
 Example NCM_comm' : forall (a b : A), a · b = b · a.
 Proof.
-  intros. reification.
+  intros. reification. 
 Defined.
 
 Example NCM_unit' : forall a, 1 · a  = a.
