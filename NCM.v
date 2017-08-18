@@ -7,7 +7,8 @@ Require Import Sorting.PermutEq. (* Standard library *)
 Class NCM A :=
     { zero : A
     ; one  : A
-    ; m    : A -> A -> A }.
+    ; m    : A -> A -> A 
+    ; base : A -> Prop }.
 Notation "0" := zero.
 Notation "1" := one.
 Notation "a · b" := (m a b) (right associativity, at level 20).
@@ -18,7 +19,7 @@ Class NCM_Laws A `{NCM A} :=
   ; NCM_assoc : forall a b c, a · (b · c) = (a · b) · c
   ; NCM_absorb: forall a, a · 0 = 0
   ; NCM_comm  : forall a b, a · b = b · a
-  ; NCM_nilpotent : forall a, a = 1 \/ a · a = 0 }.
+  ; NCM_nilpotent : forall a, base a -> a · a = 0 }.
 Hint Resolve NCM_unit NCM_absorb.
 
 Set Implicit Arguments.
@@ -31,16 +32,15 @@ Set Implicit Arguments.
 Class Interpretable (A B : Type) := { interp : B -> A }.
 Notation "[ b ]" := (interp b).
 
+About one.
+
 
 Section NCM.
   Variable A : Type.
-(*
-  Variable zero : A.
-  Variable one : A.
-  Variable m : A -> A -> A. 
-*)
   Variable NCM_A : `{NCM A}.
   Variable NCM_A_Laws : `{NCM_Laws A}.
+
+
 
 Lemma NCM_unit_l : forall a, 1 · a = a.
 Proof. intros. rewrite NCM_comm. auto. Defined.
@@ -205,7 +205,7 @@ Defined.
 (* Permutations *)
 (****************)
 
-Lemma interp_permutation : forall values idx1 idx2, 
+Lemma interp_permutation : forall (values : list A) (idx1 idx2 : list nat),
       Permutation idx1 idx2 -> 
       [index_wrt values idx1] = [index_wrt values idx2].
 Proof.
@@ -276,7 +276,7 @@ Defined.
 
 Lemma in_nilpotent : forall (ls : list A) a,
       In a ls ->
-      a <> 1 ->
+      base a ->
       a · [ls] = 0.
 Proof.
   induction ls as [ | b ls]; intros a pf_in pf_neq_1; simpl in *.
@@ -284,8 +284,7 @@ Proof.
   - destruct pf_in as [pf_in | pf_in].
     * rewrite pf_in in *.
       rewrite NCM_assoc. 
-      destruct (NCM_nilpotent a) as [ | H]; [contradiction | ].
-      rewrite H; auto.
+      rewrite NCM_nilpotent; auto.
     * rewrite NCM_comm_assoc.
       rewrite IHls; auto.
 Defined.
@@ -382,7 +381,7 @@ Proof.
 Defined.
 
 Lemma duplicate_nilpotent : forall values idx,
-      Forall (fun x => x <> 1) values ->
+      Forall base values ->
       (exists i, find_duplicate idx = Some i) ->
       [index_wrt values idx] = 0.
 Proof.
@@ -397,7 +396,7 @@ Proof.
      [ rewrite e; simpl; apply NCM_absorb_l | ].
     destruct (in_dec Nat.eq_dec j idx) as [H | H].
     * apply in_nilpotent; [ apply (in_interp_nat j); auto | ].
-      apply (@forall_in _ (fun x => x <> 1) values); auto. 
+      apply (forall_in pf_forall); auto.
     * simpl; rewrite IHidx; auto.
       destruct (find_duplicate idx) as [k | ].
       + exists k; auto.
@@ -412,8 +411,24 @@ About NCM_unit_l.
   manually, but that's really annoying.
 *)
 
-Arguments NCM_unit_l {A} {NCM_A} {NCM_laws} : rename. 
-About NCM_unit_l.
+Arguments NCM_unit_l {A} {NCM_A} {NCM_A_laws} : rename. 
+Arguments NCM_absorb_l {A} {NCM_A} {NCM_A_laws} : rename.
+Arguments NCM_comm_assoc {A} {NCM_A} {NCM_A_laws} : rename.
+Arguments NCM_zero {A} : rename.
+Arguments NCM_one {A} : rename.
+Arguments NCM_var {A} : rename.
+Arguments NCM_m {A} : rename.
+Arguments flatten_correct' {A} {NCM_A} {NCM_A_laws} : rename.
+Arguments flatten_correct {A} {NCM_A} {NCM_A_laws} : rename.
+Arguments index_wrt {A} {NCM_A} : rename.
+Arguments interp_permutation {A} {NCM_A} {NCM_A_laws} : rename.
+Arguments interp_0 {A} {NCM_A} {NCM_A_laws} : rename.
+Arguments in_nilpotent {A} {NCM_A} {NCM_A_laws} : rename.
+Arguments in_interp_nat {A} {NCM_A} {NCM_A_laws} : rename.
+Arguments in_index {A} {NCM_A} : rename.
+Arguments in_index_wrt {A} {NCM_A} : rename.
+Arguments duplicate_nilpotent {A} {NCM_A} {NCM_A_laws} : rename.
+
 
 (***************************)
 (* Putting it all together *)
@@ -433,17 +448,6 @@ Ltac find_duplicate ls :=
   match ls with
   | ?n :: ?ls' => let z := lookup n ls' in n
   | _ :: ?ls' => find_duplicate ls'
-  end.
-
-
-Ltac reify a :=
-  match a with
-  | 0 => NCM_zero
-  | 1 => NCM_one
-  | ?a1 · ?a2 => let e1 := reify a1 in
-                 let e2 := reify a2 in
-                 constr:(NCM_m e1 e2)
-  | _ => constr:(NCM_var a)
   end.
 
 
@@ -497,11 +501,25 @@ Ltac destruct_finite_In :=
   | [ H : In ?a _ |- _ ] => inversion H; try (subst; reflexivity)
   end.
 
+Close Scope nat_scope.
+
+Ltac reify A a :=
+  match a with
+  | 0 => constr:(@NCM_zero A)
+  | 1 => constr:(@NCM_one A)
+  | ?a1 · ?a2 => let e1 := reify A a1 in
+                 let e2 := reify A a2 in
+                 constr:(@NCM_m A e1 e2)
+  | _ => constr:(@NCM_var A a)
+  end.
+
+
 Ltac prep_reification := 
   match goal with
-  | [ _ : NCM ?A |- ?a1 = ?a2 ] => 
-    let e1 := reify a1 in
-    let e2 := reify a2 in
+  | [ |- ?a1 = ?a2 ] => 
+    let A := type of a1 in
+    let e1 := reify A a1 in
+    let e2 := reify A a2 in
     change (([e1] : A) = ([e2] : A));
     repeat rewrite flatten_correct; auto;
     simpl_args;
@@ -530,28 +548,23 @@ Variable A : Type.
 Variable NCM_A : `{NCM A}.
 Variable NCM_A_Laws : `{NCM_Laws A}.
 
+
+
 Example NCM_comm' : forall (a b : A), a · b = b · a.
 Proof.
-  intros.
-    let e1 := reify (a · b) in 
-    let e2 := reify (b · a) in
-    change (([e1] : A) = [e2]).
-    repeat rewrite flatten_correct; auto.
-    simpl_args.
-index_wrt ls1 idx1
-    reification_wrt.
-
-reification.
+  intros. reification.
 Defined.
 
-Example NCM_unit' : forall a, 1 · a = a.
-Proof. intros. reification. Defined.
+Example NCM_unit' : forall a, 1 · a  = a.
+Proof. intros. reification.
+Defined.
 
 
 Example NCM_absorb' : forall a, 0 · a = 0.
-Proof. intros; reification. Defined.
+Proof. intros. reification.
+Defined.
 
-Example NCM_nilpotent' : forall a, a <> 1 -> a · a = 0.
+Example NCM_nilpotent' : forall a, base a -> a · a = 0.
 Proof.
   intros. reification.
 Defined.
