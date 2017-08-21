@@ -1,7 +1,16 @@
+Require Import HoTT.
 Require Import Monad.
+Require Import List.
+Require Import Multiset.
+Require Import Permutation.
+Require Import PermutationReflection.
+Hint Resolve tt.
+
+(*
 Require Import PermutSetoid.
 Require Import Sorting.Permutation.
 Require Import Sorting.PermutEq. (* Standard library *)  
+*)
 
 
 (* Nilpotent Commutative Monoid *)
@@ -9,7 +18,7 @@ Class NCM A :=
     { zero : A
     ; one  : A
     ; m    : A -> A -> A 
-    ; base : A -> Prop }.
+    ; base : A -> Type }.
 Notation "0" := zero.
 Notation "1" := one.
 Notation "a · b" := (m a b) (right associativity, at level 20).
@@ -65,9 +74,9 @@ Open Scope list_scope.
 
 Global Instance Interp_A : Interpretable A A := {interp := fun x => x}.
 
-Definition interp_option {B} `{Interpretable A B} (o : option B) : A :=
-  match o with
-  | Some b => [b]
+Definition interp_option {B} `{Interpretable A B} (b : option B) : A :=
+  match b with
+  | Some b' => [b']
   | None => 0
   end.
 Global Instance Interp_option (B : Type) `{Interpretable A B} : Interpretable A (option B) :=
@@ -137,8 +146,8 @@ Proof.
   intros. unfold interp; simpl.
   induction e; simpl; try rewrite NCM_unit; auto. 
   rewrite IHe1, IHe2.
-  destruct (flatten e1) as [ ls1 | ] eqn:H1; auto.
-  destruct (flatten e2) as [ ls2 | ] eqn:H2; simpl; auto.
+  destruct (flatten e1) as [ ls1 | ]; auto.
+  destruct (flatten e2) as [ ls2 | ]; simpl; auto.
   apply flatten_correct'.
 Defined.
 
@@ -176,14 +185,13 @@ Instance Interp_nat_list : Interpretable A (list A * list nat) :=
 
 
 (* Default list_nat representation of a value *)
-
+ 
 Fixpoint nats_lt n : list nat :=
   match n with
   | O => nil
   | S n' => O :: fmap S (nats_lt n')
   end.
-Require Import List.
-Print map. Print list_fmap.
+
 
 Lemma index_wrt_cons : forall idx a values,
       index_wrt (a :: values) (fmap S idx) = index_wrt values idx.
@@ -192,6 +200,12 @@ Proof.
   simpl. 
   rewrite IHidx; auto.
 Defined.
+
+Fixpoint length {B} (l : list B) : nat :=
+  match l with
+  | nil => 0
+  | _ :: l' => S (length l')
+  end.
 
 Lemma index_wrt_default : forall ls, 
       index_wrt ls (nats_lt (length ls)) = ls.
@@ -219,37 +233,14 @@ Proof.
   - rewrite IHpf1, IHpf2. reflexivity.
 Defined.
 
-Lemma permutation_reflection : forall ls1 ls2,
-      @permutation nat _ PeanoNat.Nat.eq_dec ls1 ls2 -> Permutation ls1 ls2.
+About permutation.
+Arguments permutation {A} {decA}.
+Lemma permutation_reflection : forall (ls1 ls2 : list nat),
+      permutation ls1 ls2 -> Permutation ls1 ls2.
 Proof.
-  intros. apply (permutation_Permutation PeanoNat.Nat.eq_dec); auto.
+  apply permutation_Permutation.
 Defined.
 
-
-Require Import Multiset. About list_contents.
-Require Import Arith.
-
-Search multiplicity. Print multiplicity.
-
-(*
-Lemma list_contents_multiplicity : forall ls x, 
-        length ls <= x -> multiplicity (list_contents eq Nat.eq_dec ls) x = 0%nat.
-Proof.
-Admitted.
-*)
-Notation contents := (list_contents eq Nat.eq_dec).
-
-Lemma meq_multiplicity : forall (ls1 ls2 : list nat),
-      (forall x, In x ls1 \/ In x ls2 ->
-                 multiplicity (contents ls1) x = multiplicity (contents ls2) x) ->
-      meq (contents ls1) (contents ls2).
-Proof.
-  intros ls1 ls2 H x.
-  Search In.
-  destruct (in_dec Nat.eq_dec x ls1); [apply H; auto | ].
-  destruct (in_dec Nat.eq_dec x ls2); [apply H; auto | ].
-  repeat rewrite multiplicity_In_O; auto. 
-Defined.
 
 (**************)
 (* Nilpotence *)
@@ -270,7 +261,7 @@ Proof.
   induction ls; intros pf_in; simpl in *.
   - contradiction.
   - destruct pf_in as [eq | pf_in].
-    * rewrite eq. apply NCM_absorb_l.
+    * rewrite <- eq. apply NCM_absorb_l.
     * rewrite IHls; auto.
 Defined.
 
@@ -299,7 +290,7 @@ Proof.
   induction idx as [ | j idx]; intros pf_in pf_a; simpl in *.
   - contradiction.
   - destruct pf_in as [eq | pf_in].
-    * subst. rewrite pf_a. left; auto.
+    * rewrite <- eq in *. rewrite pf_a. left; auto.
     * right. apply IHidx; auto.
 Defined.
 
@@ -308,35 +299,17 @@ Defined.
 Fixpoint find_duplicate (ls : list nat) : option nat :=
   match ls with
   | nil => None
-  | n :: ls' => if in_dec Nat.eq_dec n ls' then Some n 
+  | n :: ls' => if in_dec n ls' then Some n 
                 else find_duplicate ls'
   end.
 
 
 
-Require Import List.
-Search (list ?A -> (?A -> Prop) -> Prop).
-
- 
-Lemma forall_in : forall {B : Type} P (ls : list B),
-      Forall P ls -> forall i, In i ls -> P i.
-Proof.
-  intros B P ls H i pf_in.
-  induction H; auto.
-  - contradiction.
-  - destruct pf_in as [eq | pf_in].
-    * subst; auto.
-    * apply IHForall; auto.
-Defined.
-
 Lemma in_index : forall i a values,
-      [index values i] = a -> a = 0 \/ In a values.
+      a = [index values i] -> a = 0 \/ In a values.
 Proof.
-  induction i; destruct values; intros; auto.
-  - simpl in H. right. left. auto.
-  - simpl in H. 
-    destruct (IHi _ _ H); auto.
-    right. right. auto.
+  induction i; destruct values as [ | v values]; intros H; simpl in *; auto.
+  destruct (IHi _ _ H); auto.
 Defined.
 
 Lemma in_index_wrt : forall a idx values,
@@ -351,16 +324,14 @@ Proof.
     * apply IHidx; auto.
 Defined.
 
-Search (False -> _).
 Lemma option_contradiction : forall {B C} {b : B}, Some b = None -> C.
 Proof. 
   intros B C b H.
   set (P := fun (e : option B) => match e with
-                                  | Some _ => True
-                                  | None => False
+                                  | Some _ => Unit
+                                  | None => Empty
                                   end).
-  set (X := (eq_ind (Some b) P I None H : False)).
-  exact (False_rect C X).
+  refine (Empty_rec (transport P H tt)).
 Defined.
 
 Lemma duplicate_nilpotent : forall values idx,
@@ -370,24 +341,25 @@ Lemma duplicate_nilpotent : forall values idx,
 Proof.
   intros values idx pf_forall.
   induction idx as [ | j idx]; intros [i pf_dup]; simpl in *.
-  - apply (option_contradiction (eq_sym pf_dup)).
+  - apply (option_contradiction pf_dup^).
   - change ([index values j] · [index_wrt values idx] = 0).
-    destruct (index values j) as [a | ] eqn:H_a; [ | apply NCM_absorb_l].
+    remember (index values j) as x eqn:H_a.
+    destruct x as [a | ]; [ | apply NCM_absorb_l].
     (* if j occurs in idx, then we can apply in_nilpotent. *)
-     assert (H_a' : [index values j] = a) by (rewrite H_a; auto).
-     destruct (in_index j values H_a') eqn:H'; auto;
-     [ rewrite e; simpl; apply NCM_absorb_l | ].
-    destruct (in_dec Nat.eq_dec j idx) as [H | H].
+     assert (H_a' : a = [index values j]) by (rewrite H_a; auto). 
+    remember (in_index j values H_a') as z eqn:H'.
+    destruct z;
+     [ rewrite p; simpl; apply NCM_absorb_l | ].
+    destruct (in_dec j idx) as [H | H].
     * apply in_nilpotent; [ apply (in_interp_nat j); auto | ].
-      apply (forall_in pf_forall); auto.
+      apply (forall_in _ _ pf_forall); auto.
     * simpl; rewrite IHidx; auto.
       destruct (find_duplicate idx) as [k | ].
       + exists k; auto.
-      + apply (option_contradiction (eq_sym pf_dup)).
+      + apply (option_contradiction pf_dup^).
 Defined.      
 
 End NCM.
-About NCM_unit_l.
 (* TODO: We need to get the implicit arguments better. In this case, since
   NCM_unit_l doesn't actually use the NCM_Laws in the type (or maybe for another
   reason) it does not treat it as an implicit type. For now we can do it
@@ -433,13 +405,16 @@ Ltac find_duplicate ls :=
   | _ :: ?ls' => find_duplicate ls'
   end.
 
-
 Ltac simpl_args :=
   match goal with
-  [ |- [ ?e1 ] = [ ?e2 ] ] => remember e1 as x1 eqn:H1; 
-                          remember e2 as x2 eqn:H2;
-                          simpl in H1, H2;
-                          rewrite H1, H2 in *; clear x1 x2 H1 H2
+  [ |- [ ?e1 ] = [ ?e2 ] ] => let H1 := fresh "H" in
+                              let H2 := fresh "H" in
+                              let x1 := fresh "x" in
+                              let x2 := fresh "x" in 
+                              remember e1 as x1 eqn:H1; 
+                              remember e2 as x2 eqn:H2;
+                              simpl in H1, H2;
+                              rewrite <- H1, <- H2 in *; clear x1 x2 H1 H2
   end.
 
 
@@ -480,9 +455,9 @@ Ltac reification_wrt :=
 
 Ltac destruct_finite_In :=
   repeat match goal with
-  | [ H : In _ _ \/ In _ _ |- _ ] => destruct H
-  | [ H : In _ nil |- _ ] => apply (False_rect _ H)
-  | [ H : In ?a (_ :: _) |- _ ] => destruct H; try (subst; reflexivity)
+  | [ H : In _ _ + In _ _ |- _ ] => destruct H
+  | [ H : In _ nil |- _ ] => apply (Empty_rec H)
+  | [ H : In ?a (_ :: _) |- _ ] => destruct H as [H | H]; try (rewrite H; reflexivity)
   end.
 
 
@@ -515,7 +490,7 @@ Ltac solve_reification :=
   match goal with
   | [ |- [ index_wrt ?values ?idx ] = [ None ] ] => 
     let val := find_duplicate idx in
-    rewrite duplicate_nilpotent; auto; exists val; reflexivity
+    apply duplicate_nilpotent; auto; exists val; reflexivity
   | [ |- [ None ] = [ index_wrt ?values ?idx ] ] => 
     let val := find_duplicate idx in
     rewrite duplicate_nilpotent; auto; exists val; reflexivity
@@ -536,8 +511,8 @@ Variable NCM_A_Laws : `{NCM_Laws A}.
 
 
 Example NCM_comm' : forall (a b : A), a · b = b · a.
-Proof.
-  intros. reification. 
+Proof. 
+  intros. reification.  
 Defined.
 
 Example NCM_unit' : forall a, 1 · a  = a.

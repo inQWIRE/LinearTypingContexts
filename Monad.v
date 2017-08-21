@@ -1,6 +1,7 @@
 Set Implicit Arguments.
-Require Import List.
-(*Require Import HoTT.*)
+Require Import HoTT.
+
+(*Require Import List.*)
 
 
 (** * The Functor Type Class *)

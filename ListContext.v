@@ -1,3 +1,4 @@
+Require Import HoTT.
 Require Import Monad.
 Require Import NCM.
 
@@ -33,6 +34,7 @@ Instance NCM_ListContext : NCM ListContext :=
 Lemma singleton_base : forall x a, base (singleton x a).
 Proof. intros. exists x. exists a. reflexivity. Defined.
 Hint Resolve singleton_base.
+Hint Unfold List.Forall.
 
 (* TODO: laws *)
 Instance NCM_ListContext_Laws : NCM_Laws ListContext.
