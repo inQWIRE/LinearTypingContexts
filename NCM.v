@@ -23,6 +23,8 @@ Class NCM_Laws A `{NCM A} :=
   ; NCM_nilpotent : forall a, base a -> a · a = 0 }.
 Hint Resolve NCM_unit NCM_absorb.
 
+
+
 Set Implicit Arguments.
 
 
@@ -558,7 +560,38 @@ End Examples.
 
 
 
+Unset Implicit Arguments.
+Class PMonoid (A : Type) :=
+  { one' : A ; m' : A -> A -> option A; base' : A -> Prop }.
+Print NCM_Laws.
+Class PMonoid_Laws (A : Type) `{PMonoid A} :=
+  { PMonoid_unit : forall a, m' a one' = Some a ;
+    PMonoid_assoc : forall a b c, (do x ← m' b c; m' a x) = (do x ← m' a b; m' x c) ;
+    PMonoid_comm : forall a b, m' a b = m' b a ;
+    PMonoid_nilpotence : forall a, base' a -> m' a a = None }.
 
+Instance PMonoid_NCM {A} `{PMonoid A} : NCM (option A) :=
+  { one := Some one'
+  ; zero := None 
+  ; m := fun x1 x2 => do a1 ← x1;
+                      do a2 ← x2;
+                      m' a1 a2
+  ; base := fun x => match x with
+                     | None => False
+                     | Some a => base' a
+                     end }.
+
+Instance PMonoid_NCM_Laws A `{PMonoid A} `{PMonoid_Laws A} : NCM_Laws (option A).
+Proof.
+  split.
+  - destruct a; auto. apply PMonoid_unit.
+  - destruct a; destruct b; destruct c; simpl; auto.
+    * apply PMonoid_assoc.
+    * destruct (m' a a0); auto.
+  - destruct a; auto.
+  - destruct a; destruct b; auto. apply PMonoid_comm.
+  - destruct a; auto. intros X. apply PMonoid_nilpotence. exact X.
+Defined.
 
 
 
