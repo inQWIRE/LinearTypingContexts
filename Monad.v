@@ -40,16 +40,19 @@ Notation "a >>= f" := (bind a f) (at level 50, left associativity).
 
 
 Class Monad_Correct (m : Type -> Type) `{M : Monad m} := {
-  right_unit: forall A (a: m A), a = a >>= return_;
-  left_unit: forall A (a: A) B (f: A -> m B),
+  bind_right_unit: forall A (a: m A), a = a >>= return_;
+  bind_left_unit: forall A (a: A) B (f: A -> m B),
              f a = return_ a >>= f;
-  associativity: forall A (ma: m A) B f C (g: B -> m C),
+  bind_associativity: forall A (ma: m A) B f C (g: B -> m C),
                  bind ma (fun  x=> f x >>= g) = (ma >>= f) >>= g
 }.
 
+Arguments Functor f.
+Arguments Functor_Correct f [F].
 Arguments Applicative f [F].
+Arguments Applicative_Correct f [F].
 Arguments Monad m [F] [M].
-About Monad.
+Arguments Monad_Correct m [F] [A] [M] : rename.
 
 Section monadic_functions.
  Variable m : Type -> Type. 
@@ -129,16 +132,12 @@ Instance optionA : Applicative option := { pure := @Some;
 Instance optionM : Monad option :=
   { bind := fun  A m B f => match m with None => None | Some a => f a end
   }.
-(*
-(* Checking the 3 laws *)
- - (* unit_left *)
-   abstract (intros A a; case a; split).
- - (* unit_right *)
-   abstract (split).
- - (* associativity *)
-   abstract (intros A m B f C g; case m; split).
+Instance optionM_Laws : Monad_Correct option.
+Proof. split.
+  - destruct a; auto.
+  - intros; auto.
+  - destruct ma; intros; auto.
 Defined.
-*)
 
 (* Monad Transformer *)
 Class MonadTrans (t : (Type -> Type) -> (Type -> Type)) :=

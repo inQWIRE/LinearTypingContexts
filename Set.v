@@ -92,7 +92,8 @@ Admitted.
 
 Instance PMonoid_set : PMonoid set :=
   { one' := empty
-  ; m' := merge_set}.
+  ; m' := merge_set
+  ; base' := fun x => x <> empty }.
 Instance PMonoid_set_laws : PMonoid_Laws set.
 Proof.
   split.
