@@ -233,12 +233,6 @@ Require Import Arith.
 
 Search multiplicity. Print multiplicity.
 
-(*
-Lemma list_contents_multiplicity : forall ls x, 
-        length ls <= x -> multiplicity (list_contents eq Nat.eq_dec ls) x = 0%nat.
-Proof.
-Admitted.
-*)
 Notation contents := (list_contents eq Nat.eq_dec).
 
 Lemma meq_multiplicity : forall (ls1 ls2 : list nat),
