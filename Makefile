@@ -109,7 +109,7 @@ VFILES:=Monad.v\
   Permutation.v\
   PermutationReflection.v\
   NCM.v\
-  Set.v
+  SetContext.v
 
 ifneq ($(filter-out archclean clean cleanall printenv,$(MAKECMDGOALS)),)
 -include $(addsuffix .d,$(VFILES))
