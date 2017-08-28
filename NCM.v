@@ -19,10 +19,11 @@ Class NCM A :=
     ; one  : A
     ; m    : A -> A -> A 
     ; base : A -> Type }.
-Notation "0" := zero.
-Notation "1" := one.
-Notation "a · b" := (m a b) (right associativity, at level 20).
+Notation "0" := zero : NCM_scope.
+Notation "1" := one : NCM_scope.
+Notation "a · b" := (m a b) (right associativity, at level 20) : NCM_scope.
 
+Open Scope NCM_scope.
 
 Class NCM_Laws A `{NCM A} :=
   { NCM_unit  : forall a, a · 1 = a
@@ -43,7 +44,7 @@ Set Implicit Arguments.
 (****************************)
 
 Class Interpretable (A B : Type) := { interp : B -> A }.
-Notation "[ b ]" := (interp b).
+Notation "[ b ]" := (interp b) : NCM_scope.
 
 About one.
 
