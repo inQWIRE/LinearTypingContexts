@@ -12,6 +12,7 @@ Class NCM A :=
     ; base : A -> Prop }.
 Notation "0" := zero.
 Notation "1" := one.
+(* Why right associativity? *)
 Notation "a · b" := (m a b) (right associativity, at level 20).
 
 
@@ -347,26 +348,13 @@ Proof.
     * apply IHidx; auto.
 Defined.
 
-Search (False -> _).
-Lemma option_contradiction : forall {B C} {b : B}, Some b = None -> C.
-Proof. 
-  intros B C b H.
-  set (P := fun (e : option B) => match e with
-                                  | Some _ => True
-                                  | None => False
-                                  end).
-  set (X := (eq_ind (Some b) P I None H : False)).
-  exact (False_rect C X).
-Defined.
-
 Lemma duplicate_nilpotent : forall values idx,
-      Forall base values ->
-      (exists i, find_duplicate idx = Some i) ->
+      (exists i, find_duplicate idx = Some i /\ base [index values i] ) ->
       [index_wrt values idx] = 0.
 Proof.
-  intros values idx pf_forall.
-  induction idx as [ | j idx]; intros [i pf_dup]; simpl in *.
-  - apply (option_contradiction (eq_sym pf_dup)).
+  intros values idx.
+  induction idx as [ | j idx]; intros [i [pf_dup pf_base]]; simpl in *.
+  - inversion pf_dup.
   - change ([index values j] · [index_wrt values idx] = 0).
     destruct (index values j) as [a | ] eqn:H_a; [ | apply NCM_absorb_l].
     (* if j occurs in idx, then we can apply in_nilpotent. *)
@@ -375,11 +363,12 @@ Proof.
      [ rewrite e; simpl; apply NCM_absorb_l | ].
     destruct (in_dec Nat.eq_dec j idx) as [H | H].
     * apply in_nilpotent; [ apply (in_interp_nat j); auto | ].
-      apply (forall_in pf_forall); auto.
+      inversion pf_dup; subst.
+      assumption.
     * simpl; rewrite IHidx; auto.
       destruct (find_duplicate idx) as [k | ].
-      + exists k; auto.
-      + apply (option_contradiction (eq_sym pf_dup)).
+      + inversion pf_dup; subst. exists i; intuition.
+      + inversion pf_dup. 
 Defined.      
 
 End NCM.
@@ -413,6 +402,16 @@ Arguments duplicate_nilpotent {A} {NCM_A} {NCM_A_laws} : rename.
 (* Putting it all together *)
 (***************************)
 
+Ltac print_goal :=
+  match goal with
+  | [|- ?G ] => idtac G
+  end.
+
+Ltac append ls1 ls2 := 
+  match ls1 with
+  | ?x :: ?l => let l' := append l ls2 in constr:(x :: l')
+  | nil      => ls2
+  end.
 
 Ltac lookup x xs :=
   match xs with
@@ -440,7 +439,6 @@ Ltac simpl_args :=
 
 
 
-
 (* reify_wrt values ls returns a list of indices idx so that
    interp_list_nat' values idx = ls
 *)
@@ -453,7 +451,7 @@ Ltac reify_wrt values ls :=
   end.
 
 
-
+(* Jen's version: 
 Ltac reification_wrt :=
   match goal with
   | [ |- ?a = ?a ] => reflexivity
@@ -472,7 +470,34 @@ Ltac reification_wrt :=
     let ls2' := constr:(index_wrt ls2 idx) in
     change (a1 = [ls2'])
   end.
+*)
 
+Ltac reification_wrt :=
+  match goal with
+  | [ |- ?a = ?a ] => reflexivity
+  | [ |- [Some ?ls1] = [Some ?ls2] ] =>
+    let src := append ls1 ls2 in 
+    let idx1 := reify_wrt src ls1 in
+    let idx2 := reify_wrt src ls2 in
+    let ls1' := constr:(index_wrt src idx1) in
+    let ls2' := constr:(index_wrt src idx2) in
+    idtac "hello?";
+    idtac "ls1'" ls1' ""; 
+    idtac "ls2'" ls2' ""; 
+    print_goal;
+    change ([ls1'] = [Some ls2']);
+    print_goal
+  | [ |- [Some ?ls1] = ?a2 ] =>
+    idtac "left match";
+    let idx := reify_wrt ls1 ls1 in
+    let ls1' := constr:(index_wrt ls1 idx) in
+    change ([ls1'] = a2)
+  | [ |- ?a1 = [Some ?ls2] ] =>
+    idtac "right match";
+    let idx := reify_wrt ls2 ls2 in
+    let ls2' := constr:(index_wrt ls2 idx) in
+    change (a1 = [ls2'])
+  end.
 
 Ltac destruct_finite_In :=
   repeat match goal with
@@ -494,33 +519,35 @@ Ltac reify A a :=
   | _ => constr:(@NCM_var A a)
   end.
 
-
 Ltac prep_reification := 
   match goal with
   | [ |- ?a1 = ?a2 ] => 
     let A := type of a1 in
     let e1 := reify A a1 in
     let e2 := reify A a2 in
+    idtac "e1: " e1 ""; 
+    idtac "e2: " e2 "";
     change (([e1] : A) = ([e2] : A));
+    print_goal;
     repeat rewrite flatten_correct; auto;
-    simpl_args;
-    reification_wrt
+    print_goal;
+    simpl_args  
   end.
 
 Ltac solve_reification :=
   match goal with
   | [ |- [ index_wrt ?values ?idx ] = [ None ] ] => 
     let val := find_duplicate idx in
-    rewrite duplicate_nilpotent; auto; exists val; reflexivity
+    rewrite duplicate_nilpotent; auto; exists val; split; [reflexivity|assumption]
   | [ |- [ None ] = [ index_wrt ?values ?idx ] ] => 
     let val := find_duplicate idx in
-    rewrite duplicate_nilpotent; auto; exists val; reflexivity
+    rewrite duplicate_nilpotent; auto; exists val;  split; [reflexivity|assumption]
   | [ |- [ _ ] = [ _ ] ] =>  
                         apply interp_permutation;
                         apply permutation_reflection;
-                        apply meq_multiplicity; intros; destruct_finite_In
+                        apply meq_multiplicity; intros; destruct_finite_In; fail
   end.
-Ltac reification := prep_reification; solve_reification.
+Ltac reification := prep_reification; reification_wrt; solve_reification.
 (* This doesn't account for EVARs yet *)
 
 
@@ -537,18 +564,52 @@ Proof.
 Defined.
 
 Example NCM_unit' : forall a, 1 · a  = a.
-Proof. intros. reification.
+Proof. 
+  intros. prep_reification. 
 Defined.
 
 
 Example NCM_absorb' : forall a, 0 · a = 0.
-Proof. intros. reification.
+Proof.
+  intros. prep_reification. 
 Defined.
 
 Example NCM_nilpotent' : forall a, base a -> a · a = 0.
 Proof.
-  intros. reification.
+  intros. prep_reification. reification_wrt. solve_reification.
 Defined.
+
+Example NCM_aab : forall a b, base a -> base b -> a · a · b = 0.
+Proof.
+  intros. prep_reification. reification_wrt.
+  solve_reification.
+Defined.
+
+Example NCM_aba : forall a b, base a -> a · b · a = a · a · b.
+Proof.
+  intros. prep_reification. reification_wrt. solve_reification.
+
+Example NCM_aabb : forall a b, base a -> base b -> a · a = b · b.
+Proof.
+  intros. prep_reification. reification_wrt. solve_reification.
+Qed. 
+
+Example NCM_abc : forall a b c, a · b · c = c · a · 1 · b.   
+Proof.
+  intros. prep_reification. 
+  solve_reification.
+Defined.
+
+Example NCM_evar : forall a b c, exists d, b = d -> a · b · c = c · a · 1 · d.   
+Proof.
+  intros. 
+  evar (y : A).
+  exists y.
+  intros.
+  prep_reification. reification_wrt. solve_reification.
+Defined.
+
+
 
 End Examples.
 
