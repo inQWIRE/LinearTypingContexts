@@ -13,15 +13,15 @@ Class NCM A :=
 Notation "0" := zero.
 Notation "1" := one.
 (* Why right associativity? *)
-Notation "a · b" := (m a b) (right associativity, at level 20).
+Notation "a ∙ b" := (m a b) (right associativity, at level 20).
 
 
 Class NCM_Laws A `{NCM A} :=
-  { NCM_unit  : forall a, a · 1 = a
-  ; NCM_assoc : forall a b c, a · (b · c) = (a · b) · c
-  ; NCM_absorb: forall a, a · 0 = 0
-  ; NCM_comm  : forall a b, a · b = b · a
-  ; NCM_nilpotent : forall a, base a -> a · a = 0 }.
+  { NCM_unit  : forall a, a ∙ 1 = a
+  ; NCM_assoc : forall a b c, a ∙ (b ∙ c) = (a ∙ b) ∙ c
+  ; NCM_absorb: forall a, a ∙ 0 = 0
+  ; NCM_comm  : forall a b, a ∙ b = b ∙ a
+  ; NCM_nilpotent : forall a, base a -> a ∙ a = 0 }.
 Hint Resolve NCM_unit NCM_absorb.
 
 
@@ -46,14 +46,14 @@ Section NCM.
 
 
 
-Lemma NCM_unit_l : forall a, 1 · a = a.
+Lemma NCM_unit_l : forall a, 1 ∙ a = a.
 Proof. intros. rewrite NCM_comm. auto. Defined.
 Hint Resolve NCM_unit_l.
-Lemma NCM_absorb_l : forall a, 0 · a = 0. 
+Lemma NCM_absorb_l : forall a, 0 ∙ a = 0. 
 Proof. intros. rewrite NCM_comm. auto. Defined.
 Hint Resolve NCM_absorb_l.
 
-Lemma NCM_comm_assoc : forall a b c, a · b · c = b · a · c.
+Lemma NCM_comm_assoc : forall a b c, a ∙ b ∙ c = b ∙ a ∙ c.
 Proof.
   intros. rewrite NCM_assoc. rewrite (NCM_comm a b). rewrite <- NCM_assoc.
   reflexivity.
@@ -79,7 +79,7 @@ Global Instance Interp_option (B : Type) `{Interpretable A B} : Interpretable A 
 Fixpoint interp_list {B} `{Interpretable A B} (ls : list B) :=
   match ls with
   | nil => 1
-  | b :: ls' => [b] · interp_list ls'
+  | b :: ls' => [b] ∙ interp_list ls'
   end.
 Global Instance Interp_list (B : Type) `{Interpretable A B} : Interpretable A (list B) :=
   { interp := interp_list }.
@@ -104,7 +104,7 @@ Fixpoint interp_NCM (e : NCM_exp) : A :=
   | NCM_zero => 0
   | NCM_one => 1
   | NCM_var a => a
-  | NCM_m e1 e2 => interp_NCM e1 · interp_NCM e2
+  | NCM_m e1 e2 => interp_NCM e1 ∙ interp_NCM e2
   end.
 Global Instance Interp_NCM : Interpretable A NCM_exp := {interp := interp_NCM}.
 
@@ -126,7 +126,7 @@ Fixpoint flatten (e : NCM_exp) : option (list A) :=
 
 
 Lemma flatten_correct' : forall (ls1 ls2 : list A),
-      [ls1] · [ls2] = [ls1 ++ ls2].
+      [ls1] ∙ [ls2] = [ls1 ++ ls2].
 Proof.
   induction ls1; intros; auto.
   simpl.
@@ -275,7 +275,7 @@ Defined.
 Lemma in_nilpotent : forall (ls : list A) a,
       In a ls ->
       base a ->
-      a · [ls] = 0.
+      a ∙ [ls] = 0.
 Proof.
   induction ls as [ | b ls]; intros a pf_in pf_neq_1; simpl in *.
   - contradiction.
@@ -355,7 +355,7 @@ Proof.
   intros values idx.
   induction idx as [ | j idx]; intros [i [pf_dup pf_base]]; simpl in *.
   - inversion pf_dup.
-  - change ([index values j] · [index_wrt values idx] = 0).
+  - change ([index values j] ∙ [index_wrt values idx] = 0).
     destruct (index values j) as [a | ] eqn:H_a; [ | apply NCM_absorb_l].
     (* if j occurs in idx, then we can apply in_nilpotent. *)
      assert (H_a' : [index values j] = a) by (rewrite H_a; auto).
@@ -514,7 +514,7 @@ Ltac reify A a :=
   match a with
   | 0 => constr:(@NCM_zero A)
   | 1 => constr:(@NCM_one A)
-  | ?a1 · ?a2 => let e1 := reify A a1 in
+  | ?a1 ∙ ?a2 => let e1 := reify A a1 in
                  let e2 := reify A a2 in
                  constr:(@NCM_m A e1 e2)
   | _ => constr:(@NCM_var A a)
@@ -567,7 +567,7 @@ Variable NCM_A_Laws : `{NCM_Laws A}.
 
 
 
-Example NCM_comm' : forall (a b : A), a · b = b · a.
+Example NCM_comm' : forall (a b : A), a ∙ b = b ∙ a.
 Proof.
   intros.
   prep_reification.
@@ -575,44 +575,44 @@ Proof.
   solve_reification.
 Defined.
 
-Example NCM_unit' : forall a, 1 · a  = a.
+Example NCM_unit' : forall a, 1 ∙ a  = a.
 Proof. 
   intros. prep_reification. 
 Defined.
 
 
-Example NCM_absorb' : forall a, 0 · a = 0.
+Example NCM_absorb' : forall a, 0 ∙ a = 0.
 Proof.
   intros. prep_reification. 
 Defined.
 
-Example NCM_nilpotent' : forall a, base a -> a · a = 0.
+Example NCM_nilpotent' : forall a, base a -> a ∙ a = 0.
 Proof.
   intros. prep_reification. reification_wrt. solve_reification.
 Defined.
 
-Example NCM_aab : forall a b, base a -> base b -> a · a · b = 0.
+Example NCM_aab : forall a b, base a -> base b -> a ∙ a ∙ b = 0.
 Proof.
   intros. prep_reification. reification_wrt.
   solve_reification.
 Defined.
 
-Example NCM_aba : forall a b, base a -> a · b · a = a · a · b.
+Example NCM_aba : forall a b, base a -> a ∙ b ∙ a = a ∙ a ∙ b.
 Proof.
   intros. prep_reification. reification_wrt. solve_reification.
 Qed.
 
-Example NCM_aabb : forall a b, base a -> base b -> a · a = b · b.
+Example NCM_aabb : forall a b, base a -> base b -> a ∙ a = b ∙ b.
 Proof.
   intros. prep_reification. reification_wrt. solve_reification.
 Qed. 
 
-Example NCM_abc : forall a b c, a · b · c = c · a · 1 · b.   
+Example NCM_abc : forall a b c, a ∙ b ∙ c = c ∙ a ∙ 1 ∙ b.   
 Proof.
   intros. reification.
 Defined.
 
-Example NCM_evar : forall a b c, exists d, b = d -> a · b · c = c · a · 1 · d.   
+Example NCM_evar : forall a b c, exists d, b = d -> a ∙ b ∙ c = c ∙ a ∙ 1 ∙ d.   
 Proof.
   intros. 
   evar (y : A).
