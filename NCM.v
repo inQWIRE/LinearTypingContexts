@@ -4,6 +4,7 @@ Require Import Sorting.Permutation.
 Require Import Sorting.PermutEq. (* Standard library *)  
 
 
+(* Nilpotent Commutative Monoid *)
 Class NCM A :=
     { zero : A
     ; one  : A
@@ -22,6 +23,8 @@ Class NCM_Laws A `{NCM A} :=
   ; NCM_comm  : forall a b, a · b = b · a
   ; NCM_nilpotent : forall a, base a -> a · a = 0 }.
 Hint Resolve NCM_unit NCM_absorb.
+
+
 
 Set Implicit Arguments.
 
@@ -231,12 +234,6 @@ Require Import Arith.
 
 Search multiplicity. Print multiplicity.
 
-(*
-Lemma list_contents_multiplicity : forall ls x, 
-        length ls <= x -> multiplicity (list_contents eq Nat.eq_dec ls) x = 0%nat.
-Proof.
-Admitted.
-*)
 Notation contents := (list_contents eq Nat.eq_dec).
 
 Lemma meq_multiplicity : forall (ls1 ls2 : list nat),
@@ -304,36 +301,6 @@ Proof.
 Defined.
 
 
-(* Instead of using multiplicity, use a special operation intended to check for duplicates *)
-
-(*
-Lemma duplicate_nilpotent' : forall values idx i,
-      index values i <> 1 ->
-      multiplicity (contents idx) i > 1 ->
-      interp_list' (interp_list_nat' values idx) = 0.
-Proof.
-  induction idx; intros i H_i H_multiplicity.
-  - simpl in H_multiplicity. inversion H_multiplicity.
-  - simpl in H_multiplicity. destruct (Nat.eq_dec a i) eqn:H_a_i; simpl in *.
-    * subst. 
-      apply gt_S_n in H_multiplicity.
-      apply multiplicity_In in H_multiplicity.
-      apply in_nilpotent; auto.
-      apply in_interp_nat. auto.
-    * rewrite (IHidx i); auto.
-Defined.
-
-Lemma duplicate_nilpotent : forall values idx i,
-      index values i <> 1 ->
-      multiplicity (contents idx) i > 1 ->
-      interp_list_nat values (Some idx) = 0.
-Proof.
-  intros. unfold interp_list_nat; simpl. apply (duplicate_nilpotent' _ _ i); auto.
-Qed.
-*)
-
-About in_dec.
-
 (* find the value of the first duplicated value in the list *)
 Fixpoint find_duplicate (ls : list nat) : option nat :=
   match ls with
@@ -381,16 +348,12 @@ Proof.
     * apply IHidx; auto.
 Defined.
 
-Definition check_base (i : nat) values :=
-  lookup i values 
-
 Lemma duplicate_nilpotent : forall values idx,
-      Forall base values ->
-      (exists i, find_duplicate idx = Some i /\ check_base i values) ->
+      (exists i, find_duplicate idx = Some i /\ base [index values i] ) ->
       [index_wrt values idx] = 0.
 Proof.
-  intros values idx pf_forall.
-  induction idx as [ | j idx]; intros [i pf_dup]; simpl in *.
+  intros values idx.
+  induction idx as [ | j idx]; intros [i [pf_dup pf_base]]; simpl in *.
   - inversion pf_dup.
   - change ([index values j] · [index_wrt values idx] = 0).
     destruct (index values j) as [a | ] eqn:H_a; [ | apply NCM_absorb_l].
@@ -400,11 +363,12 @@ Proof.
      [ rewrite e; simpl; apply NCM_absorb_l | ].
     destruct (in_dec Nat.eq_dec j idx) as [H | H].
     * apply in_nilpotent; [ apply (in_interp_nat j); auto | ].
-      apply (forall_in pf_forall); auto.
+      inversion pf_dup; subst.
+      assumption.
     * simpl; rewrite IHidx; auto.
       destruct (find_duplicate idx) as [k | ].
-      + exists k; auto.
-      + inversion pf_dup.
+      + inversion pf_dup; subst. exists i; intuition.
+      + inversion pf_dup. 
 Defined.      
 
 End NCM.
@@ -441,6 +405,12 @@ Arguments duplicate_nilpotent {A} {NCM_A} {NCM_A_laws} : rename.
 Ltac print_goal :=
   match goal with
   | [|- ?G ] => idtac G
+  end.
+
+Ltac append ls1 ls2 := 
+  match ls1 with
+  | ?x :: ?l => let l' := append l ls2 in constr:(x :: l')
+  | nil      => ls2
   end.
 
 Ltac lookup x xs :=
@@ -506,14 +476,11 @@ Ltac reification_wrt :=
   match goal with
   | [ |- ?a = ?a ] => reflexivity
   | [ |- [Some ?ls1] = [Some ?ls2] ] =>
-(*    let idx1 := reify_wrt (ls1 ++ ls2) ls1 in
-    let idx2 := reify_wrt (ls1 ++ ls2) ls2 in
-    let ls1' := constr:(index_wrt (ls1 ++ ls2) idx1) in
-    let ls2' := constr:(index_wrt (ls1 ++ ls2) idx2) in *)
-    let idx1 := reify_wrt ls1 ls1 in
-    let idx2 := reify_wrt ls1 ls2 in
-    let ls1' := constr:(index_wrt ls1 idx1) in
-    let ls2' := constr:(index_wrt ls1 idx2) in
+    let src := append ls1 ls2 in 
+    let idx1 := reify_wrt src ls1 in
+    let idx2 := reify_wrt src ls2 in
+    let ls1' := constr:(index_wrt src idx1) in
+    let ls2' := constr:(index_wrt src idx2) in
     idtac "hello?";
     idtac "ls1'" ls1' ""; 
     idtac "ls2'" ls2' ""; 
@@ -535,8 +502,10 @@ Ltac reification_wrt :=
 Ltac destruct_finite_In :=
   repeat match goal with
   | [ H : In _ _ \/ In _ _ |- _ ] => destruct H
-  | [ H : In ?a _ |- _ ] => inversion H; try (subst; reflexivity)
+  | [ H : In _ nil |- _ ] => apply (False_rect _ H)
+  | [ H : In ?a (_ :: _) |- _ ] => destruct H; try (subst; reflexivity)
   end.
+
 
 Close Scope nat_scope.
 
@@ -569,14 +538,14 @@ Ltac solve_reification :=
   match goal with
   | [ |- [ index_wrt ?values ?idx ] = [ None ] ] => 
     let val := find_duplicate idx in
-    rewrite duplicate_nilpotent; auto; exists val; reflexivity
+    rewrite duplicate_nilpotent; auto; exists val; split; [reflexivity|assumption]
   | [ |- [ None ] = [ index_wrt ?values ?idx ] ] => 
     let val := find_duplicate idx in
-    rewrite duplicate_nilpotent; auto; exists val; reflexivity
+    rewrite duplicate_nilpotent; auto; exists val;  split; [reflexivity|assumption]
   | [ |- [ _ ] = [ _ ] ] =>  
                         apply interp_permutation;
                         apply permutation_reflection;
-                        apply meq_multiplicity; intros; destruct_finite_In
+                        apply meq_multiplicity; intros; destruct_finite_In; fail
   end.
 Ltac reification := prep_reification; reification_wrt; solve_reification.
 (* This doesn't account for EVARs yet *)
@@ -591,22 +560,7 @@ Variable NCM_A_Laws : `{NCM_Laws A}.
 
 Example NCM_comm' : forall (a b : A), a · b = b · a.
 Proof.
-  intros. prep_reification. 
-
-(*
-  assert ([Some (b :: a :: nil)] = [index_wrt (a :: b :: nil) (1::0::nil)%nat])
-    by reflexivity.
-  rewrite H.
-  assert ([Some (a :: b :: nil)] = [index_wrt (a :: b :: nil) (0::1::nil)%nat])
-    by reflexivity.
-  rewrite H0.
-(*  change ([index_wrt (a :: b :: nil) (0::1::nil)%nat] = 
-          [Some (index_wrt (a :: b :: nil) (1::0::nil)%nat)]).
-        why not??? *)
-  change ([index_wrt (a :: b :: nil) (0::1::nil)%nat] = 
-          [Some (index_wrt (a :: b :: nil) (1::0::nil)%nat)]).
-*)
- reification_wrt. solve_reification.
+  intros. reification. 
 Defined.
 
 Example NCM_unit' : forall a, 1 · a  = a.
@@ -628,9 +582,7 @@ Defined.
 Example NCM_aab : forall a b, base a -> base b -> a · a · b = 0.
 Proof.
   intros. prep_reification. reification_wrt.
-  let x := find_duplicate (0 :: 0 :: 2 :: nil)%nat in idtac x.
-  rewrite duplicate_nilpotent; auto.
-solve_reification.
+  solve_reification.
 Defined.
 
 Example NCM_aba : forall a b, base a -> a · b · a = a · a · b.
@@ -640,11 +592,11 @@ Proof.
 Example NCM_aabb : forall a b, base a -> base b -> a · a = b · b.
 Proof.
   intros. prep_reification. reification_wrt. solve_reification.
+Qed. 
 
 Example NCM_abc : forall a b c, a · b · c = c · a · 1 · b.   
 Proof.
   intros. prep_reification. 
-(*  simpl (index_wrt (a :: b :: c :: nil) (2%nat :: 0%nat :: 1%nat :: nil)). *)
   solve_reification.
 Defined.
 
@@ -663,7 +615,38 @@ End Examples.
 
 
 
+Unset Implicit Arguments.
+Class PMonoid (A : Type) :=
+  { one' : A ; m' : A -> A -> option A; base' : A -> Prop }.
+Print NCM_Laws.
+Class PMonoid_Laws (A : Type) `{PMonoid A} :=
+  { PMonoid_unit : forall a, m' a one' = Some a ;
+    PMonoid_assoc : forall a b c, (do x ← m' b c; m' a x) = (do x ← m' a b; m' x c) ;
+    PMonoid_comm : forall a b, m' a b = m' b a ;
+    PMonoid_nilpotence : forall a, base' a -> m' a a = None }.
 
+Instance PMonoid_NCM {A} `{PMonoid A} : NCM (option A) :=
+  { one := Some one'
+  ; zero := None 
+  ; m := fun x1 x2 => do a1 ← x1;
+                      do a2 ← x2;
+                      m' a1 a2
+  ; base := fun x => match x with
+                     | None => False
+                     | Some a => base' a
+                     end }.
+
+Instance PMonoid_NCM_Laws A `{PMonoid A} `{PMonoid_Laws A} : NCM_Laws (option A).
+Proof.
+  split.
+  - destruct a; auto. apply PMonoid_unit.
+  - destruct a; destruct b; destruct c; simpl; auto.
+    * apply PMonoid_assoc.
+    * destruct (m' a a0); auto.
+  - destruct a; auto.
+  - destruct a; destruct b; auto. apply PMonoid_comm.
+  - destruct a; auto. intros X. apply PMonoid_nilpotence. exact X.
+Defined.
 
 
 
