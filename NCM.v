@@ -472,7 +472,13 @@ Ltac reification_wrt :=
   end.
 *)
 
+Ltac type_of_goal := 
+  match goal with
+  | [ |- ?a = _ ] => type of a
+  end.
+
 Ltac reification_wrt :=
+  let A := type_of_goal in
   match goal with
   | [ |- ?a = ?a ] => reflexivity
   | [ |- [Some ?ls1] = [Some ?ls2] ] =>
@@ -481,12 +487,7 @@ Ltac reification_wrt :=
     let idx2 := reify_wrt src ls2 in
     let ls1' := constr:(index_wrt src idx1) in
     let ls2' := constr:(index_wrt src idx2) in
-    idtac "hello?";
-    idtac "ls1'" ls1' ""; 
-    idtac "ls2'" ls2' ""; 
-    print_goal;
-    change ([ls1'] = [Some ls2']);
-    print_goal
+    change (([ls1'] : A) = ([ls2'] : A))
   | [ |- [Some ?ls1] = ?a2 ] =>
     idtac "left match";
     let idx := reify_wrt ls1 ls1 in
@@ -534,18 +535,26 @@ Ltac prep_reification :=
     simpl_args  
   end.
 
+Ltac simplify_duplicates values idx :=
+  let val := find_duplicate idx in
+  rewrite (duplicate_nilpotent values idx);
+  [| exists val; split; [reflexivity | assumption] ].
+
+Ltac find_permutation :=
+  apply interp_permutation;
+  apply permutation_reflection;
+  apply meq_multiplicity;
+  intros; destruct_finite_In;
+  fail.
+
 Ltac solve_reification :=
   match goal with
-  | [ |- [ index_wrt ?values ?idx ] = [ None ] ] => 
-    let val := find_duplicate idx in
-    rewrite duplicate_nilpotent; auto; exists val; split; [reflexivity|assumption]
-  | [ |- [ None ] = [ index_wrt ?values ?idx ] ] => 
-    let val := find_duplicate idx in
-    rewrite duplicate_nilpotent; auto; exists val;  split; [reflexivity|assumption]
-  | [ |- [ _ ] = [ _ ] ] =>  
-                        apply interp_permutation;
-                        apply permutation_reflection;
-                        apply meq_multiplicity; intros; destruct_finite_In; fail
+  | [ |- [ index_wrt ?values ?idx ] = [ None ] ] => simplify_duplicates values idx; auto
+  | [ |- [ None ] = [ index_wrt ?values ?idx ] ] => simplify_duplicates values idx; auto
+  | [ |- [ index_wrt ?values1 ?idx1 ] = [ index_wrt ?values2 ?idx2 ] ] => 
+    simplify_duplicates values1 idx1; 
+    simplify_duplicates values2 idx2; auto
+  | [ |- [ _ ] = [ _ ] ] =>  find_permutation
   end.
 Ltac reification := prep_reification; reification_wrt; solve_reification.
 (* This doesn't account for EVARs yet *)
@@ -560,7 +569,10 @@ Variable NCM_A_Laws : `{NCM_Laws A}.
 
 Example NCM_comm' : forall (a b : A), a · b = b · a.
 Proof.
-  intros. reification. 
+  intros.
+  prep_reification.
+  reification_wrt.
+  solve_reification.
 Defined.
 
 Example NCM_unit' : forall a, 1 · a  = a.
@@ -588,6 +600,7 @@ Defined.
 Example NCM_aba : forall a b, base a -> a · b · a = a · a · b.
 Proof.
   intros. prep_reification. reification_wrt. solve_reification.
+Qed.
 
 Example NCM_aabb : forall a b, base a -> base b -> a · a = b · b.
 Proof.
@@ -596,15 +609,14 @@ Qed.
 
 Example NCM_abc : forall a b c, a · b · c = c · a · 1 · b.   
 Proof.
-  intros. prep_reification. 
-  solve_reification.
+  intros. reification.
 Defined.
 
 Example NCM_evar : forall a b c, exists d, b = d -> a · b · c = c · a · 1 · d.   
 Proof.
   intros. 
   evar (y : A).
-  exists y.
+  exists y. unfold y.
   intros.
   prep_reification. reification_wrt. solve_reification.
 Defined.
