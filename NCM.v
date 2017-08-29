@@ -13,7 +13,7 @@ Class NCM A :=
 Notation "0" := zero.
 Notation "1" := one.
 (* Why right associativity? *)
-Notation "a ∙ b" := (m a b) (right associativity, at level 20).
+Notation "a ∙ b" := (m a b) (left associativity, at level 20).
 
 
 Class NCM_Laws A `{NCM A} :=
@@ -53,10 +53,15 @@ Lemma NCM_absorb_l : forall a, 0 ∙ a = 0.
 Proof. intros. rewrite NCM_comm. auto. Defined.
 Hint Resolve NCM_absorb_l.
 
-Lemma NCM_comm_assoc : forall a b c, a ∙ b ∙ c = b ∙ a ∙ c.
+Lemma NCM_comm_assoc : forall a b c, a ∙ (b ∙ c) = b ∙ (a ∙ c).
 Proof.
   intros. rewrite NCM_assoc. rewrite (NCM_comm a b). rewrite <- NCM_assoc.
   reflexivity.
+Defined.
+
+Lemma NCM_comm_assoc' : forall a b c, a ∙ b ∙ c = b ∙ a ∙ c.
+Proof.
+  intros. rewrite (NCM_comm a b). reflexivity.
 Defined.
 
 
@@ -415,10 +420,8 @@ Ltac append ls1 ls2 :=
 
 Ltac lookup x xs :=
   match xs with
-    | x :: _ => O
-    | _ :: ?xs' =>
-        let n := lookup x xs' in
-        constr:(S n)
+    | x :: _ => constr:(O)
+    | ?y :: ?xs' => let n := lookup x xs' in constr:(S n)
   end.
 
 (* Also want an Ltac version *)
@@ -446,8 +449,13 @@ Ltac reify_wrt values ls :=
   match ls with
   | nil => constr:(@nil nat)
   | ?a :: ?ls' => let i := lookup a values in
-                  let idx := reify_wrt values ls' in
-                  constr:(i :: idx)
+                 let idx := reify_wrt values ls' in
+                 constr:(i :: idx)
+(* evar case 
+  | ?a :: ?ls' => let i := constr:(100) in 
+                 let idx := reify_wrt values ls' in
+                 constr:(i :: idx) (* change *)
+*)
   end.
 
 
@@ -489,12 +497,10 @@ Ltac reification_wrt :=
     let ls2' := constr:(index_wrt src idx2) in
     change (([ls1'] : A) = ([ls2'] : A))
   | [ |- [Some ?ls1] = ?a2 ] =>
-    idtac "left match";
     let idx := reify_wrt ls1 ls1 in
     let ls1' := constr:(index_wrt ls1 idx) in
     change ([ls1'] = a2)
   | [ |- ?a1 = [Some ?ls2] ] =>
-    idtac "right match";
     let idx := reify_wrt ls2 ls2 in
     let ls2' := constr:(index_wrt ls2 idx) in
     change (a1 = [ls2'])
@@ -526,12 +532,8 @@ Ltac prep_reification :=
     let A := type of a1 in
     let e1 := reify A a1 in
     let e2 := reify A a2 in
-    idtac "e1: " e1 ""; 
-    idtac "e2: " e2 "";
     change (([e1] : A) = ([e2] : A));
-    print_goal;
     repeat rewrite flatten_correct; auto;
-    print_goal;
     simpl_args  
   end.
 
@@ -609,18 +611,124 @@ Qed.
 
 Example NCM_abc : forall a b c, a ∙ b ∙ c = c ∙ a ∙ 1 ∙ b.   
 Proof.
-  intros. reification.
+  intros. prep_reification. reification_wrt. 
+  (* find_permutation *)
+  apply interp_permutation. apply permutation_reflection. apply meq_multiplicity.
+   intros. repeat destruct H; trivial.
 Defined.
 
-Example NCM_evar : forall a b c, exists d, b = d -> a ∙ b ∙ c = c ∙ a ∙ 1 ∙ d.   
+(* Now to deal with evars!!! *)
+
+Ltac has_evars term := 
+  match term with
+    | ?L = ?R        => has_evar L; has_evar R
+    | ?L = ?R        => has_evars L
+    | ?L = ?R        => has_evars R
+    | ?Γ1 ∙ ?Γ2      => has_evar Γ1; has_evar Γ2
+    | ?Γ1 ∙ ?Γ2      => has_evars Γ1
+    | ?Γ1 ∙ ?Γ2      => has_evars Γ2
+  end.
+
+Ltac repos_evar :=
+  repeat match goal with 
+  | [ |- ?G ] => has_evars G; fail 1
+  | [ |- ?a = ?b ] => has_evar b; symmetry 
+  | [ |- context[?a ∙ ?b]] => has_evar a; rewrite (NCM_comm a b)
+  end;
+  repeat match goal with 
+  | [ |- ?a ∙ (?b ∙ ?c) = _ ] => rewrite (NCM_assoc a b c)
+  end.
+  
+Ltac rm_evar ls :=
+  match ls with
+  | nil => nil 
+  | ?a :: ?ls' => let ls'' := rm_evar ls' in constr:(a :: ls'')
+  | ?a :: ?ls' => ls' (* I cannot believe this works. Jeez. *)
+  end.
+
+Ltac split_reify_wrt vs1 vs2 ls :=
+  match ls with
+  | nil => constr:((@nil nat, @nil nat))
+  (* in subset vs1 *)
+  | ?a :: ?ls' => let i := lookup a vs1 in
+                 let idx := split_reify_wrt vs1 vs2 ls' in
+                 match idx with 
+                 | (?l, ?r) => constr:((i :: l, r))
+                 end
+  (* not in subset vs1 *)
+  | ?a :: ?ls' => let i := lookup a vs2 in
+                 let idx := split_reify_wrt vs1 vs2 ls' in
+                 match idx with 
+                 | (?l, ?r) => constr:((l, i :: r))
+                 end
+  end.
+  
+Ltac simpl_args_evar :=
+  match goal with
+  [ |- [ ?e1 ] ∙ ?ev = [ ?e2 ] ] => 
+                          remember e1 as x1 eqn:H1; 
+                          remember e2 as x2 eqn:H2;
+                          simpl in H1, H2;
+                          rewrite H1, H2 in *; clear x1 x2 H1 H2
+  end.
+
+Ltac prep_reification_evar := 
+  match goal with
+  | [ |- ?a1 ∙ ?ev = ?a2 ] => 
+    let A := type of a1 in
+    let e1 := reify A a1 in
+    let e2 := reify A a2 in
+    change (([e1] : A) ∙ ev = ([e2] : A));
+    repeat rewrite flatten_correct; auto;
+    simpl_args_evar  
+  end.
+
+Ltac reification_wrt_evar :=
+  let A := type_of_goal in
+  match goal with
+  | [ |- [Some ?ls1] ∙ ?ev = [Some ?ls2] ] =>
+    let sub := ls1 in
+    let super := append sub ls2 in 
+    let idx := split_reify_wrt sub super ls2 in
+    let ls2' := match idx with
+                | (?idx2, ?idx3) => constr:(index_wrt super (idx2 ++ idx3))
+                end in
+    replace ([Some ls2]) with ([ls2'] : A) by (simpl; reification)
+  end.
+
+Lemma split_list : forall values ls1 ls2,
+  [index_wrt values (ls1 ++ ls2)] = [index_wrt values ls1] ∙ [index_wrt values ls2].
+Admitted.
+
+Lemma split_m : forall a1 a2 b1 b2, a1 = a2 -> b1 = b2 -> a1 ∙ b1 = a2 ∙ b2.
+Proof. intros; subst; reflexivity. Qed.
+
+Ltac reification' := 
+  repos_evar;
+  prep_reification_evar;
+  reification_wrt_evar;
+  rewrite split_list;
+  apply split_m; [reification | reflexivity].
+
+
+Example NCM_evar : forall a b c, exists d, b = d -> a ∙ b ∙ c = c ∙ d ∙ a ∙ 1.   
 Proof.
   intros. 
   evar (y : A).
   exists y. unfold y.
   intros.
-  prep_reification. reification_wrt. solve_reification.
-Defined.
+  reification'.
+Qed.  
 
+Example NCM_evar2 : forall a b c d e, exists x, x = d ∙ e ∙ b -> 
+                                      a ∙ x ∙ c = b ∙ c ∙ d ∙ 1 ∙ e ∙ a. 
+Proof.
+  intros. 
+  evar (y : A).
+  exists y. unfold y.
+  intros.
+  reification'.
+Qed.  
 
 
 End Examples.
