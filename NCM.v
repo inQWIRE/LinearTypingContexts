@@ -698,7 +698,11 @@ Ltac reification_wrt_evar :=
 
 Lemma split_list : forall values ls1 ls2,
   [index_wrt values (ls1 ++ ls2)] = [index_wrt values ls1] ∙ [index_wrt values ls2].
-Admitted.
+Proof.
+  induction ls1; intros.
+  + simpl. rewrite NCM_unit_l. reflexivity.
+  + simpl in *. rewrite IHls1. rewrite NCM_assoc. reflexivity.
+Qed.  
 
 Lemma split_m : forall a1 a2 b1 b2, a1 = a2 -> b1 = b2 -> a1 ∙ b1 = a2 ∙ b2.
 Proof. intros; subst; reflexivity. Qed.
@@ -732,7 +736,6 @@ Qed.
 
 
 End Examples.
-
 
 
 Unset Implicit Arguments.
