@@ -103,7 +103,8 @@ endif
 
 VFILES:=Monad.v\
   NCM.v\
-  ListContext.v
+  ListContext.v\
+  IndexContext.v
 
 ifneq ($(filter-out archclean clean cleanall printenv,$(MAKECMDGOALS)),)
 -include $(addsuffix .d,$(VFILES))

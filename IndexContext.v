@@ -143,7 +143,7 @@ Defined.
 Hint Resolve singleton_not_empty.
 
 
-Example test : forall x y a b, singleton x a · singleton y b = singleton y b · singleton x a · 1.
+Example test : forall x y a b, singleton x a ∙ singleton y b = singleton y b ∙ singleton x a ∙ 1.
 Proof.
   intros. reification.
 Defined.

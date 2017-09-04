@@ -374,7 +374,38 @@ Proof.
       destruct (find_duplicate idx) as [k | ].
       + inversion pf_dup; subst. exists i; intuition.
       + inversion pf_dup. 
-Defined.      
+Defined.
+  
+(* Proving properties are not 0 *)
+(* We will need an additional axiom. Either prove compositional properties about
+   x <> 0, or prove something about the base property *)
+
+Axiom one_neq_zero : 1 <> 0.
+(* AND *)
+Axiom merge_neq_0 : forall a b, a <> 0 -> b <> 0 -> a ∙ b <> 0.
+(* OR *)
+Axiom base_or_0 : forall a, 1 <> 0 -> a <> 0 <-> base a \/ a = 1.
+
+Lemma not_base : ~ (base 1).
+Proof.
+  intros H.
+  absurd (1 ∙ 1 = 0). 
+  - rewrite NCM_unit. apply one_neq_zero.
+  - apply NCM_nilpotent; auto.
+Defined.
+
+Lemma multiplicity_neq0 : forall values idx,
+      Forall (fun i => [index values i] <> 0 /\ base [index values i]) idx ->
+      [index_wrt values idx] <> 0.
+Proof.
+  induction idx; simpl; intros; auto. apply one_neq_zero.
+  inversion H; subst.
+  apply merge_neq_0.
+  * intuition.
+  * apply IHidx; auto.
+Defined.
+  
+
 
 End NCM.
 About NCM_unit_l.

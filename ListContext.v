@@ -64,9 +64,9 @@ Instance NCM_ListContext_Laws : NCM_Laws ListContext.
 Admitted.
 
 
-Example test : forall (x : nat) (a : A), singleton x a · singleton x a = 0.
+Example test : forall (x : nat) (a : A), singleton x a ∙ singleton x a = 0.
 Proof.
-  intros. reification.
-Defined.
+  intros. admit (*reification.*).
+Abort.
 
 End ListContext.
