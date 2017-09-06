@@ -53,7 +53,7 @@ Instance NCM_ListContext : NCM ListContext :=
     ; zero := None
     ; m := mergeListContext 
     ; base := fun b => exists x a, b = singleton x a}.
-
+Opaque base.
 
 Lemma singleton_base : forall x a, base (singleton x a).
 Proof. intros. exists x. exists a. reflexivity. Defined.
@@ -66,7 +66,7 @@ Admitted.
 
 Example test : forall (x : nat) (a : A), singleton x a ∙ singleton x a = 0.
 Proof.
-  intros. admit (*reification.*).
-Abort.
+  intros. reification.
+Defined.
 
 End ListContext.

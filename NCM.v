@@ -21,10 +21,11 @@ Class NCM_Laws A `{NCM A} :=
   ; NCM_assoc : forall a b c, a ∙ (b ∙ c) = (a ∙ b) ∙ c
   ; NCM_absorb: forall a, a ∙ 0 = 0
   ; NCM_comm  : forall a b, a ∙ b = b ∙ a
-  ; NCM_nilpotent : forall a, base a -> a ∙ a = 0 }.
+  ; NCM_nilpotent : forall a, base a -> a ∙ a = 0
+  (* is this strictly necessary? *) (* also gives us ~ base 1 (NCM_base_1) *)
+  ; NCM_base_0 : ~ base 0
+}.
 Hint Resolve NCM_unit NCM_absorb.
-
-
 
 Set Implicit Arguments.
 
@@ -64,6 +65,25 @@ Proof.
   intros. rewrite (NCM_comm a b). reflexivity.
 Defined.
 
+Lemma NCM_base_1 : ~ base 1.
+Proof.
+  intros H.
+  assert (H' : 1 = 0).
+  {
+    apply NCM_nilpotent in H.
+    rewrite NCM_unit in H. 
+    assumption.
+  }
+  apply NCM_base_0.
+  rewrite H' in H; auto.
+Defined.
+
+Lemma base_neq_0 : forall a, base a -> a <> 0.
+Proof.
+  intros a H H'.
+  rewrite H' in H.
+  apply NCM_base_0; auto.
+Defined.
 
 (****************************)
 (* Interpretable type class *)
@@ -81,6 +101,11 @@ Definition interp_option {B} `{Interpretable A B} (o : option B) : A :=
 Global Instance Interp_option (B : Type) `{Interpretable A B} : Interpretable A (option B) :=
   { interp := interp_option }.
 
+Lemma interp_Some : forall a, [Some a] = a.
+Proof.
+  auto.
+Defined.
+
 Fixpoint interp_list {B} `{Interpretable A B} (ls : list B) :=
   match ls with
   | nil => 1
@@ -88,9 +113,6 @@ Fixpoint interp_list {B} `{Interpretable A B} (ls : list B) :=
   end.
 Global Instance Interp_list (B : Type) `{Interpretable A B} : Interpretable A (list B) :=
   { interp := interp_list }.
-
-
-
 
 
 (***************************************)
@@ -376,35 +398,10 @@ Proof.
       + inversion pf_dup. 
 Defined.
   
+(********************************)
 (* Proving properties are not 0 *)
-(* We will need an additional axiom. Either prove compositional properties about
-   x <> 0, or prove something about the base property *)
+(********************************)
 
-Axiom one_neq_zero : 1 <> 0.
-(* AND *)
-Axiom merge_neq_0 : forall a b, a <> 0 -> b <> 0 -> a ∙ b <> 0.
-(* OR *)
-Axiom base_or_0 : forall a, 1 <> 0 -> a <> 0 <-> base a \/ a = 1.
-
-Lemma not_base : ~ (base 1).
-Proof.
-  intros H.
-  absurd (1 ∙ 1 = 0). 
-  - rewrite NCM_unit. apply one_neq_zero.
-  - apply NCM_nilpotent; auto.
-Defined.
-
-Lemma multiplicity_neq0 : forall values idx,
-      Forall (fun i => [index values i] <> 0 /\ base [index values i]) idx ->
-      [index_wrt values idx] <> 0.
-Proof.
-  induction idx; simpl; intros; auto. apply one_neq_zero.
-  inversion H; subst.
-  apply merge_neq_0.
-  * intuition.
-  * apply IHidx; auto.
-Defined.
-  
 
 
 End NCM.
@@ -571,7 +568,7 @@ Ltac prep_reification :=
 Ltac simplify_duplicates values idx :=
   let val := find_duplicate idx in
   rewrite (duplicate_nilpotent values idx);
-  [| exists val; split; [reflexivity | assumption] ].
+  [| exists val; split; [reflexivity | simpl; auto] ].
 
 Ltac find_permutation :=
   apply interp_permutation;
@@ -582,11 +579,11 @@ Ltac find_permutation :=
 
 Ltac solve_reification :=
   match goal with
-  | [ |- [ index_wrt ?values ?idx ] = [ None ] ] => simplify_duplicates values idx; auto
-  | [ |- [ None ] = [ index_wrt ?values ?idx ] ] => simplify_duplicates values idx; auto
   | [ |- [ index_wrt ?values1 ?idx1 ] = [ index_wrt ?values2 ?idx2 ] ] => 
     simplify_duplicates values1 idx1; 
     simplify_duplicates values2 idx2; auto
+  | [ |- [ index_wrt ?values ?idx ] = _ ] => simplify_duplicates values idx; auto
+  | [ |- _ = [ index_wrt ?values ?idx ] ] => simplify_duplicates values idx; auto
   | [ |- [ _ ] = [ _ ] ] =>  find_permutation
   end.
 Ltac reification := prep_reification; reification_wrt; solve_reification.
@@ -777,7 +774,8 @@ Class PMonoid_Laws (A : Type) `{PMonoid A} :=
   { PMonoid_unit : forall a, m' a one' = Some a ;
     PMonoid_assoc : forall a b c, (do x ← m' b c; m' a x) = (do x ← m' a b; m' x c) ;
     PMonoid_comm : forall a b, m' a b = m' b a ;
-    PMonoid_nilpotence : forall a, base' a -> m' a a = None }.
+    PMonoid_nilpotence : forall a, base' a -> m' a a = None
+   }.
 
 Instance PMonoid_NCM {A} `{PMonoid A} : NCM (option A) :=
   { one := Some one'
@@ -800,9 +798,5 @@ Proof.
   - destruct a; auto.
   - destruct a; destruct b; auto. apply PMonoid_comm.
   - destruct a; auto. intros X. apply PMonoid_nilpotence. exact X.
+  - auto.
 Defined.
-
-
-
-
-
