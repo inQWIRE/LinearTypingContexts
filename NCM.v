@@ -21,17 +21,21 @@ Class NCM A :=
     ; base : A -> Type }.
 Notation "0" := zero : NCM_scope.
 Notation "1" := one : NCM_scope.
-Notation "a · b" := (m a b) (right associativity, at level 20) : NCM_scope.
+Notation "a ∙ b" := (m a b) (left associativity, at level 25) : NCM_scope.
+
 
 Open Scope NCM_scope.
 
 Class NCM_Laws A `{NCM A} :=
-  { NCM_unit  : forall a, a · 1 = a
-  ; NCM_assoc : forall a b c, a · (b · c) = (a · b) · c
-  ; NCM_absorb: forall a, a · 0 = 0
-  ; NCM_comm  : forall a b, a · b = b · a
-  ; NCM_nilpotent : forall a, base a -> a · a = 0 }.
-Hint Resolve NCM_unit NCM_absorb.
+  { NCM_unit  : forall a, a ∙ 1 = a
+  ; NCM_assoc : forall a b c, a ∙ (b ∙ c) = (a ∙ b) ∙ c
+  ; NCM_absorb: forall a, a ∙ 0 = 0
+  ; NCM_comm  : forall a b, a ∙ b = b ∙ a
+  ; NCM_nilpotent : forall a, base a -> a ∙ a = 0
+  ; NCM_base_0 : ~ base 0
+  ; NCM_1_0 : 1 <> 0
+}.
+Hint Resolve NCM_unit NCM_absorb NCM_base_0 NCM_1_0.
 
 
 
@@ -56,19 +60,44 @@ Section NCM.
 
 
 
-Lemma NCM_unit_l : forall a, 1 · a = a.
+Lemma NCM_unit_l : forall a, 1 ∙ a = a.
 Proof. intros. rewrite NCM_comm. auto. Defined.
 Hint Resolve NCM_unit_l.
-Lemma NCM_absorb_l : forall a, 0 · a = 0. 
+Lemma NCM_absorb_l : forall a, 0 ∙ a = 0. 
 Proof. intros. rewrite NCM_comm. auto. Defined.
 Hint Resolve NCM_absorb_l.
 
-Lemma NCM_comm_assoc : forall a b c, a · b · c = b · a · c.
+Lemma NCM_comm_assoc : forall a b c, a ∙ (b ∙ c) = b ∙ (a ∙ c).
 Proof.
   intros. rewrite NCM_assoc. rewrite (NCM_comm a b). rewrite <- NCM_assoc.
   reflexivity.
 Defined.
 
+Lemma NCM_comm_assoc' : forall a b c, a ∙ b ∙ c = b ∙ a ∙ c.
+Proof.
+  intros. rewrite (NCM_comm a b). reflexivity.
+Defined.
+
+
+Lemma NCM_base_1 : ~ base 1.
+Proof.
+  intros H.
+  assert (H' : 1 = 0).
+  {
+    apply NCM_nilpotent in H.
+    rewrite NCM_unit in H. 
+    assumption.
+  }
+  apply NCM_base_0.
+  rewrite H' in H; auto.
+Defined.
+
+Lemma base_neq_0 : forall a, base a -> a <> 0.
+Proof.
+  intros a H H'.
+  rewrite H' in H.
+  apply NCM_base_0; auto.
+Defined.
 
 (****************************)
 (* Interpretable type class *)
@@ -86,16 +115,18 @@ Definition interp_option {B} `{Interpretable A B} (b : option B) : A :=
 Global Instance Interp_option (B : Type) `{Interpretable A B} : Interpretable A (option B) :=
   { interp := interp_option }.
 
+Lemma interp_Some : forall a, [Some a] = a.
+Proof.
+  auto.
+Defined.
+
 Fixpoint interp_list {B} `{Interpretable A B} (ls : list B) :=
   match ls with
   | nil => 1
-  | b :: ls' => [b] · interp_list ls'
+  | b :: ls' => [b] ∙ interp_list ls'
   end.
 Global Instance Interp_list (B : Type) `{Interpretable A B} : Interpretable A (list B) :=
   { interp := interp_list }.
-
-
-
 
 
 (***************************************)
@@ -114,7 +145,7 @@ Fixpoint interp_NCM (e : NCM_exp) : A :=
   | NCM_zero => 0
   | NCM_one => 1
   | NCM_var a => a
-  | NCM_m e1 e2 => interp_NCM e1 · interp_NCM e2
+  | NCM_m e1 e2 => interp_NCM e1 ∙ interp_NCM e2
   end.
 Global Instance Interp_NCM : Interpretable A NCM_exp := {interp := interp_NCM}.
 
@@ -136,7 +167,7 @@ Fixpoint flatten (e : NCM_exp) : option (list A) :=
 
 
 Lemma flatten_correct' : forall (ls1 ls2 : list A),
-      [ls1] · [ls2] = [ls1 ++ ls2].
+      [ls1] ∙ [ls2] = [ls1 ++ ls2].
 Proof.
   induction ls1; intros; auto.
   simpl.
@@ -273,7 +304,7 @@ Defined.
 Lemma in_nilpotent : forall (ls : list A) a,
       In a ls ->
       base a ->
-      a · [ls] = 0.
+      a ∙ [ls] = 0.
 Proof.
   induction ls as [ | b ls]; intros a pf_in pf_neq_1; simpl in *.
   - contradiction.
@@ -338,30 +369,33 @@ Proof.
   refine (Empty_rec (transport P H tt)).
 Defined.
 
+Lemma option_inversion : forall {B} {b c : B}, Some b = Some c -> b = c.
+Admitted.
+
 Lemma duplicate_nilpotent : forall values idx,
-      Forall base values ->
-      (exists i, find_duplicate idx = Some i) ->
+      (exists i, find_duplicate idx = Some i /\ base [index values i] ) ->
       [index_wrt values idx] = 0.
 Proof.
-  intros values idx pf_forall.
-  induction idx as [ | j idx]; intros [i pf_dup]; simpl in *.
+  intros values idx.
+  induction idx as [ | j idx]; intros [i [pf_dup pf_base]]; simpl in *.
   - apply (option_contradiction pf_dup^).
-  - change ([index values j] · [index_wrt values idx] = 0).
-    remember (index values j) as x eqn:H_a.
-    destruct x as [a | ]; [ | apply NCM_absorb_l].
-    (* if j occurs in idx, then we can apply in_nilpotent. *)
-     assert (H_a' : a = [index values j]) by (rewrite H_a; auto). 
-    remember (in_index j values H_a') as z eqn:H'.
-    destruct z;
-     [ rewrite p; simpl; apply NCM_absorb_l | ].
-    destruct (in_dec j idx) as [H | H].
-    * apply in_nilpotent; [ apply (in_interp_nat j); auto | ].
-      apply (forall_in _ _ pf_forall); auto.
-    * simpl; rewrite IHidx; auto.
-      destruct (find_duplicate idx) as [k | ].
-      + exists k; auto.
-      + apply (option_contradiction pf_dup^).
-Defined.      
+  - change ([index values j] ∙ [index_wrt values idx] = 0).
+    destruct (in_dec j idx).
+    * apply option_inversion in pf_dup. 
+      rewrite pf_dup in *.
+      remember (index values i) as z eqn:Hz.
+      destruct z; auto.
+      rewrite in_nilpotent; auto.
+      apply (in_interp_nat i); auto.
+    * simpl. rewrite IHidx; auto.
+      exists i. split; auto.
+Defined.
+  
+(********************************)
+(* Proving properties are not 0 *)
+(********************************)
+
+
 
 End NCM.
 (* TODO: We need to get the implicit arguments better. In this case, since
@@ -393,13 +427,21 @@ Arguments duplicate_nilpotent {A} {NCM_A} {NCM_A_laws} : rename.
 (* Putting it all together *)
 (***************************)
 
+Ltac print_goal :=
+  match goal with
+  | [|- ?G ] => idtac G
+  end.
+
+Ltac append ls1 ls2 := 
+  match ls1 with
+  | ?x :: ?l => let l' := append l ls2 in constr:(x :: l')
+  | nil      => ls2
+  end.
 
 Ltac lookup x xs :=
   match xs with
-    | x :: _ => O
-    | _ :: ?xs' =>
-        let n := lookup x xs' in
-        constr:(S n)
+    | x :: _ => constr:(O)
+    | ?y :: ?xs' => let n := lookup x xs' in constr:(S n)
   end.
 
 (* Also want an Ltac version *)
@@ -423,7 +465,6 @@ Ltac simpl_args :=
 
 
 
-
 (* reify_wrt values ls returns a list of indices idx so that
    interp_list_nat' values idx = ls
 *)
@@ -431,12 +472,17 @@ Ltac reify_wrt values ls :=
   match ls with
   | nil => constr:(@nil nat)
   | ?a :: ?ls' => let i := lookup a values in
-                  let idx := reify_wrt values ls' in
-                  constr:(i :: idx)
+                 let idx := reify_wrt values ls' in
+                 constr:(i :: idx)
+(* evar case 
+  | ?a :: ?ls' => let i := constr:(100) in 
+                 let idx := reify_wrt values ls' in
+                 constr:(i :: idx) (* change *)
+*)
   end.
 
 
-
+(* Jen's version: 
 Ltac reification_wrt :=
   match goal with
   | [ |- ?a = ?a ] => reflexivity
@@ -455,7 +501,33 @@ Ltac reification_wrt :=
     let ls2' := constr:(index_wrt ls2 idx) in
     change (a1 = [ls2'])
   end.
+*)
 
+Ltac type_of_goal := 
+  match goal with
+  | [ |- ?a = _ ] => type of a
+  end.
+
+Ltac reification_wrt :=
+  let A := type_of_goal in
+  match goal with
+  | [ |- ?a = ?a ] => reflexivity
+  | [ |- [Some ?ls1] = [Some ?ls2] ] =>
+    let src := append ls1 ls2 in 
+    let idx1 := reify_wrt src ls1 in
+    let idx2 := reify_wrt src ls2 in
+    let ls1' := constr:(index_wrt src idx1) in
+    let ls2' := constr:(index_wrt src idx2) in
+    change (([ls1'] : A) = ([ls2'] : A))
+  | [ |- [Some ?ls1] = ?a2 ] =>
+    let idx := reify_wrt ls1 ls1 in
+    let ls1' := constr:(index_wrt ls1 idx) in
+    change ([ls1'] = a2)
+  | [ |- ?a1 = [Some ?ls2] ] =>
+    let idx := reify_wrt ls2 ls2 in
+    let ls2' := constr:(index_wrt ls2 idx) in
+    change (a1 = [ls2'])
+  end.
 
 Ltac destruct_finite_In :=
   repeat match goal with
@@ -471,12 +543,11 @@ Ltac reify A a :=
   match a with
   | 0 => constr:(@NCM_zero A)
   | 1 => constr:(@NCM_one A)
-  | ?a1 · ?a2 => let e1 := reify A a1 in
+  | ?a1 ∙ ?a2 => let e1 := reify A a1 in
                  let e2 := reify A a2 in
                  constr:(@NCM_m A e1 e2)
   | _ => constr:(@NCM_var A a)
   end.
-
 
 Ltac prep_reification := 
   match goal with
@@ -486,24 +557,31 @@ Ltac prep_reification :=
     let e2 := reify A a2 in
     change (([e1] : A) = ([e2] : A));
     repeat rewrite flatten_correct; auto;
-    simpl_args;
-    reification_wrt
+    simpl_args  
   end.
+
+Ltac simplify_duplicates values idx :=
+  let val := find_duplicate idx in
+  rewrite (duplicate_nilpotent values idx);
+  [| exists val; split; [reflexivity | simpl; auto] ].
+
+Ltac find_permutation :=
+  apply interp_permutation;
+  apply permutation_reflection;
+  apply meq_multiplicity;
+  intros; destruct_finite_In;
+  fail.
 
 Ltac solve_reification :=
   match goal with
-  | [ |- [ index_wrt ?values ?idx ] = [ None ] ] => 
-    let val := find_duplicate idx in
-    apply duplicate_nilpotent; auto; exists val; reflexivity
-  | [ |- [ None ] = [ index_wrt ?values ?idx ] ] => 
-    let val := find_duplicate idx in
-    rewrite duplicate_nilpotent; auto; exists val; reflexivity
-  | [ |- [ _ ] = [ _ ] ] =>  
-                        apply interp_permutation;
-                        apply permutation_reflection;
-                        apply meq_multiplicity; intros; destruct_finite_In
+  | [ |- [ index_wrt ?values1 ?idx1 ] = [ index_wrt ?values2 ?idx2 ] ] => 
+    simplify_duplicates values1 idx1; 
+    simplify_duplicates values2 idx2; auto
+  | [ |- [ index_wrt ?values ?idx ] = _ ] => simplify_duplicates values idx; auto
+  | [ |- _ = [ index_wrt ?values ?idx ] ] => simplify_duplicates values idx; auto
+  | [ |- [ _ ] = [ _ ] ] =>  find_permutation
   end.
-Ltac reification := prep_reification; solve_reification.
+Ltac reification := prep_reification; reification_wrt; solve_reification.
 (* This doesn't account for EVARs yet *)
 
 
@@ -514,38 +592,193 @@ Variable NCM_A_Laws : `{NCM_Laws A}.
 
 
 
-Example NCM_comm' : forall (a b : A), a · b = b · a.
-Proof. 
-  intros. reification.  
-Defined.
-
-Example NCM_unit' : forall a, 1 · a  = a.
-Proof. intros. reification.
-Defined.
-
-
-Example NCM_absorb' : forall a, 0 · a = 0.
-Proof. intros. reification.
-Defined.
-
-Example NCM_nilpotent' : forall a, base a -> a · a = 0.
+Example NCM_comm' : forall (a b : A), a ∙ b = b ∙ a.
 Proof.
-  intros. reification.
+  intros.
+  prep_reification.
+  reification_wrt.
+  solve_reification.
 Defined.
+
+Example NCM_unit' : forall a, 1 ∙ a  = a.
+Proof. 
+  intros. prep_reification. 
+Defined.
+
+
+Example NCM_absorb' : forall a, 0 ∙ a = 0.
+Proof.
+  intros. prep_reification. 
+Defined.
+
+Example NCM_nilpotent' : forall a, base a -> a ∙ a = 0.
+Proof.
+  intros. prep_reification. reification_wrt. solve_reification.
+Defined.
+
+Example NCM_aab : forall a b, base a -> base b -> a ∙ a ∙ b = 0.
+Proof.
+  intros. prep_reification. reification_wrt.
+  solve_reification.
+Defined.
+
+Example NCM_aba : forall a b, base a -> a ∙ b ∙ a = a ∙ a ∙ b.
+Proof.
+  intros. prep_reification. reification_wrt. solve_reification.
+Qed.
+
+Example NCM_aabb : forall a b, base a -> base b -> a ∙ a = b ∙ b.
+Proof.
+  intros. prep_reification. reification_wrt. solve_reification.
+Qed. 
+
+Example NCM_abc : forall a b c, a ∙ b ∙ c = c ∙ a ∙ 1 ∙ b.   
+Proof.
+  intros. prep_reification. reification_wrt. solve_reification. 
+Defined.
+
+(* Now to deal with evars!!! *)
+
+Ltac has_evars term := 
+  match term with
+    | ?L = ?R        => has_evar L; has_evar R
+    | ?L = ?R        => has_evars L
+    | ?L = ?R        => has_evars R
+    | ?Γ1 ∙ ?Γ2      => has_evar Γ1; has_evar Γ2
+    | ?Γ1 ∙ ?Γ2      => has_evars Γ1
+    | ?Γ1 ∙ ?Γ2      => has_evars Γ2
+  end.
+
+Ltac repos_evar :=
+  repeat match goal with 
+  | [ |- ?G ] => has_evars G; fail 1
+  | [ |- ?a = ?b ] => has_evar b; symmetry 
+  | [ |- context[?a ∙ ?b]] => has_evar a; rewrite (NCM_comm a b)
+  end;
+  repeat match goal with 
+  | [ |- ?a ∙ (?b ∙ ?c) = _ ] => rewrite (NCM_assoc a b c)
+  end.
+  
+Ltac rm_evar ls :=
+  match ls with
+  | nil => nil 
+  | ?a :: ?ls' => let ls'' := rm_evar ls' in constr:(a :: ls'')
+  | ?a :: ?ls' => ls' (* I cannot believe this works. Jeez. *)
+  end.
+
+Ltac split_reify_wrt vs1 vs2 ls :=
+  match ls with
+  | nil => constr:((@nil nat, @nil nat))
+  (* in subset vs1 *)
+  | ?a :: ?ls' => let i := lookup a vs1 in
+                 let idx := split_reify_wrt vs1 vs2 ls' in
+                 match idx with 
+                 | (?l, ?r) => constr:((i :: l, r))
+                 end
+  (* not in subset vs1 *)
+  | ?a :: ?ls' => let i := lookup a vs2 in
+                 let idx := split_reify_wrt vs1 vs2 ls' in
+                 match idx with 
+                 | (?l, ?r) => constr:((l, i :: r))
+                 end
+  end.
+  
+
+Ltac simpl_args_evar :=
+  match goal with
+  [ |- [ ?e1 ] ∙ ?ev = [ ?e2 ] ] => 
+                          let H1 := fresh "H" in
+                          let H2 := fresh "H" in
+                          let x1 := fresh "x" in
+                          let x2 := fresh "x" in
+                          remember e1 as x1 eqn:H1; 
+                          remember e2 as x2 eqn:H2;
+                          simpl in H1, H2;
+                          rewrite <- H1, <- H2 in *; clear x1 x2 H1 H2
+ end.
+
+Ltac prep_reification_evar := 
+  match goal with
+  | [ |- ?a1 ∙ ?ev = ?a2 ] => 
+    let A := type of a1 in
+    let e1 := reify A a1 in
+    let e2 := reify A a2 in
+    change (([e1] : A) ∙ ev = ([e2] : A));
+    repeat rewrite flatten_correct; auto;
+    simpl_args_evar  
+  end.
+
+Ltac reification_wrt_evar :=
+  let A := type_of_goal in
+  match goal with
+  | [ |- [Some ?ls1] ∙ ?ev = [Some ?ls2] ] =>
+    let sub := ls1 in
+    let super := append sub ls2 in 
+    let idx := split_reify_wrt sub super ls2 in
+    let ls2' := match idx with
+                | (?idx2, ?idx3) => constr:(index_wrt super (idx2 ++ idx3))
+                end in
+    apply (@Overture.concat A _ ([ls2'] : A));
+      [ | simpl; reification]
+  end.
+
+
+Lemma split_list : forall values ls1 ls2,
+  [index_wrt values (ls1 ++ ls2)] = [index_wrt values ls1] ∙ [index_wrt values ls2].
+Proof.
+  induction ls1; intros.
+  + simpl. rewrite NCM_unit_l. reflexivity.
+  + simpl in *. rewrite IHls1. rewrite NCM_assoc. reflexivity.
+Qed.  
+
+Lemma split_m : forall a1 a2 b1 b2, a1 = a2 -> b1 = b2 -> a1 ∙ b1 = a2 ∙ b2.
+Proof. 
+  intros a1 a2 b1 b2 Ha Hb.
+  rewrite Ha, Hb.
+  reflexivity.
+Defined.
+
+Ltac reification' := 
+  repos_evar;
+  prep_reification_evar;
+  reification_wrt_evar;
+  rewrite split_list;
+  apply split_m; [reification | reflexivity].
+
+
+Example NCM_evar : forall a b c, exists d, b = d -> a ∙ b ∙ c = c ∙ d ∙ a ∙ 1.   
+Proof.
+  intros. 
+  evar (y : A).
+  exists y. unfold y.
+  intros.
+  reification'.
+Qed.  
+
+Example NCM_evar2 : forall a b c d e, exists x, x = d ∙ e ∙ b -> 
+                                      a ∙ x ∙ c = b ∙ c ∙ d ∙ 1 ∙ e ∙ a. 
+Proof.
+  intros. 
+  evar (y : A).
+  exists y. unfold y.
+  intros.
+  reification'.
+Qed.  
+
 
 End Examples.
 
 
-
 Unset Implicit Arguments.
 Class PMonoid (A : Type) :=
-  { one' : A ; m' : A -> A -> option A; base' : A -> Type }.
+  { one' : A ; m' : A -> A -> option A; base' : A -> Prop }.
 Print NCM_Laws.
 Class PMonoid_Laws (A : Type) `{PMonoid A} :=
   { PMonoid_unit : forall a, m' a one' = Some a ;
     PMonoid_assoc : forall a b c, (do x ← m' b c; m' a x) = (do x ← m' a b; m' x c) ;
     PMonoid_comm : forall a b, m' a b = m' b a ;
-    PMonoid_nilpotence : forall a, base' a -> m' a a = None }.
+    PMonoid_nilpotence : forall a, base' a -> m' a a = None
+   }.
 
 Instance PMonoid_NCM {A} `{PMonoid A} : NCM (option A) :=
   { one := Some one'
@@ -568,7 +801,7 @@ Proof.
   - destruct a; auto.
   - destruct a; destruct b; auto. apply PMonoid_comm.
   - destruct a; auto. intros X. apply PMonoid_nilpotence. exact X.
+  - auto.
+  - simpl. intros G. apply (option_contradiction G).
 Defined.
-
-
 

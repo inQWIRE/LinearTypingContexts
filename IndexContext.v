@@ -79,9 +79,15 @@ Defined.
 
                                        
 
+<<<<<<< HEAD
 Instance PMonoid_IdxMap : PMonoid IdxMap := 
     { one' := nil; m' := mergeIdxMap; base' := fun i => ~(isEmpty i) }.
 Instance PMonoid_IdxMap_Laws : PMonoid_Laws IdxMap.
+=======
+Global Instance PMonoid_IdxMap : PMonoid IdxMap := 
+    { one' := nil; m' := mergeIdxMap; base' := fun i => ~(isEmpty i) }.
+Global Instance PMonoid_IdxMap_Laws : PMonoid_Laws IdxMap.
+>>>>>>> master
 Proof.
   split.
   - auto.
@@ -143,7 +149,11 @@ Defined.
 Hint Resolve singleton_not_empty.
 
 
+<<<<<<< HEAD
 Example test : forall x y a b, singleton x a · singleton y b = singleton y b · singleton x a · 1.
+=======
+Example test : forall x y a b, singleton x a ∙ singleton y b = singleton y b ∙ singleton x a ∙ 1.
+>>>>>>> master
 Proof.
   intros. reification.
 Defined.

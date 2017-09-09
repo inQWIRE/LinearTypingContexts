@@ -4,3 +4,5 @@
 *.glob
 *.aux
 *~
+*.v.d
+Makefile.bak
