@@ -24,8 +24,9 @@ Class NCM_Laws A `{NCM A} :=
   ; NCM_nilpotent : forall a, base a -> a ∙ a = 0
   (* is this strictly necessary? *) (* also gives us ~ base 1 (NCM_base_1) *)
   ; NCM_base_0 : ~ base 0
+  ; NCM_1_0 : 1 <> 0
 }.
-Hint Resolve NCM_unit NCM_absorb.
+Hint Resolve NCM_unit NCM_absorb NCM_base_0 NCM_1_0.
 
 Set Implicit Arguments.
 
@@ -64,6 +65,7 @@ Lemma NCM_comm_assoc' : forall a b c, a ∙ b ∙ c = b ∙ a ∙ c.
 Proof.
   intros. rewrite (NCM_comm a b). reflexivity.
 Defined.
+
 
 Lemma NCM_base_1 : ~ base 1.
 Proof.
@@ -799,4 +801,5 @@ Proof.
   - destruct a; destruct b; auto. apply PMonoid_comm.
   - destruct a; auto. intros X. apply PMonoid_nilpotence. exact X.
   - auto.
+  - simpl. inversion 1.
 Defined.

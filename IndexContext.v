@@ -79,9 +79,9 @@ Defined.
 
                                        
 
-Instance PMonoid_IdxMap : PMonoid IdxMap := 
+Global Instance PMonoid_IdxMap : PMonoid IdxMap := 
     { one' := nil; m' := mergeIdxMap; base' := fun i => ~(isEmpty i) }.
-Instance PMonoid_IdxMap_Laws : PMonoid_Laws IdxMap.
+Global Instance PMonoid_IdxMap_Laws : PMonoid_Laws IdxMap.
 Proof.
   split.
   - auto.
