@@ -30,7 +30,7 @@ Lemma mergeIdxMap_nil_r : forall i, mergeIdxMap i nil = Some i.
 Proof.
   destruct i; auto.
 Defined.
-Hint Resolve mergeIdxMap_nil_r.
+
 
 Lemma mergeIdxMap_step : forall o1 o2 i1 i2,
     mergeIdxMap (o1 :: i1) (o2 :: i2) = do o ← mergeOption o1 o2;
@@ -77,29 +77,24 @@ Proof.
   destruct x; destruct y; auto.
 Defined.
 
-                                       
-
-Global Instance PMonoid_IdxMap : PMonoid IdxMap := 
-    { one' := nil; m' := mergeIdxMap; base' := fun i => ~(isEmpty i) }.
-Global Instance PMonoid_IdxMap_Laws : PMonoid_Laws IdxMap.
-Proof.
-  split.
-  - auto.
-  - assert (H : forall X (x : X), Some x = return_ x) by reflexivity.
+Hint Resolve mergeIdxMap_nil_r.
+Lemma IdxMap_assoc : forall a b c, 
+      (do x ← mergeIdxMap b c; mergeIdxMap a x) = (do x ← mergeIdxMap a b; mergeIdxMap x c).
+    assert (H : forall X (x : X), Some x = return_ x) by reflexivity.
     induction a as [ | x a]; intros;
     [  simpl; destruct (mergeIdxMap b c); auto | ].
     destruct b as [ | y b]; destruct c as [ | z c]; auto.
-    * repeat rewrite mergeIdxMap_nil_r.
+    * repeat rewrite mergeIdxMap_nil_r. 
       rewrite H, <- bind_left_unit.
-      rewrite (bind_right_unit _ (m' (x :: a) (y :: b))) at 1.
+      rewrite (bind_right_unit _ (mergeIdxMap (x :: a) (y :: b))) at 1.
       apply bind_option_eq; auto. 
     * repeat rewrite mergeIdxMap_step.
       repeat rewrite <- bind_associativity.
       rewrite (bind_option_eq (mergeOption y z) _
-                (fun x0 => do i ← mergeIdxMap b c; m' (x :: a) (x0 :: i))); 
+                (fun x0 => do i ← mergeIdxMap b c; mergeIdxMap (x :: a) (x0 :: i))); 
         [ | intros; rewrite <- bind_associativity; apply bind_option_eq; auto ].
       rewrite (bind_option_eq (mergeOption x y)  _
-                (fun x0 => do i ← mergeIdxMap a b; m' (x0 :: i) (z :: c))); 
+                (fun x0 => do i ← mergeIdxMap a b; mergeIdxMap (x0 :: i) (z :: c))); 
         [ | intros; rewrite <- bind_associativity; apply bind_option_eq; auto ].
       erewrite (bind_option_eq (mergeOption y z));
         [ | intros; apply bind_option_eq; intros; apply mergeIdxMap_step ].
@@ -114,11 +109,29 @@ Proof.
       apply bind_option_eq; intros.
       repeat rewrite bind_associativity.
       rewrite IHa. reflexivity.
-  - induction a as [ | x a]; destruct b as [ | y b]; auto.
+Defined.
+
+Lemma IdxMap_comm : forall a b, mergeIdxMap a b = mergeIdxMap b a.
+Proof.
+  induction a as [ | x a]; destruct b as [ | y b]; auto.
     repeat rewrite mergeIdxMap_step.
     rewrite mergeOption_comm.
     apply bind_option_eq; intros o.
     rewrite IHa. reflexivity.
+Defined.
+
+
+End IndexContext.
+Hint Resolve mergeIdxMap_nil_r.
+
+Instance PMonoid_IdxMap A : PMonoid (IdxMap A) :=
+    { one' := nil; m' := @mergeIdxMap A; base' := fun i => ~(isEmpty i) }.
+Instance PMonoid_IdxMap_Laws A : PMonoid_Laws (IdxMap A).
+Proof.
+  split.
+  - simpl; auto.
+  - apply IdxMap_assoc.
+  - apply IdxMap_comm.
   - induction a as [ | o a]; intros H.
     * simpl in H. contradiction. 
     * simpl in *. destruct o; simpl; auto.
@@ -127,7 +140,8 @@ Defined.
 
 (* Now option IdxCtx should be an NCM *)
 
-
+Section Tests.
+Variable A : Type.
 Fixpoint singleton' (x : nat) (a : A) :=
   match x with
   | O => Some a :: nil
@@ -148,5 +162,5 @@ Proof.
   intros. reification.
 Defined.
 
-End IndexContext.
+End Tests.
     

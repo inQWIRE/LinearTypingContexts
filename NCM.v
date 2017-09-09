@@ -399,6 +399,19 @@ Proof.
       + inversion pf_dup; subst. exists i; intuition.
       + inversion pf_dup. 
 Defined.
+
+
+Lemma split_list : forall values ls1 ls2,
+  [index_wrt values (ls1 ++ ls2)] = [index_wrt values ls1] ∙ [index_wrt values ls2].
+Proof.
+  induction ls1; intros.
+  + simpl. rewrite NCM_unit_l. reflexivity.
+  + simpl in *. rewrite IHls1. rewrite NCM_assoc. reflexivity.
+Qed.  
+
+Lemma split_m : forall a1 a2 b1 b2, a1 = a2 -> b1 = b2 -> a1 ∙ b1 = a2 ∙ b2.
+Proof. intros; subst; reflexivity. Qed.
+
   
 (********************************)
 (* Proving properties are not 0 *)
@@ -592,61 +605,6 @@ Ltac reification := prep_reification; reification_wrt; solve_reification.
 (* This doesn't account for EVARs yet *)
 
 
-Section Examples.
-Variable A : Type.
-Variable NCM_A : `{NCM A}.
-Variable NCM_A_Laws : `{NCM_Laws A}.
-
-
-
-Example NCM_comm' : forall (a b : A), a ∙ b = b ∙ a.
-Proof.
-  intros.
-  prep_reification.
-  reification_wrt.
-  solve_reification.
-Defined.
-
-Example NCM_unit' : forall a, 1 ∙ a  = a.
-Proof. 
-  intros. prep_reification. 
-Defined.
-
-
-Example NCM_absorb' : forall a, 0 ∙ a = 0.
-Proof.
-  intros. prep_reification. 
-Defined.
-
-Example NCM_nilpotent' : forall a, base a -> a ∙ a = 0.
-Proof.
-  intros. prep_reification. reification_wrt. solve_reification.
-Defined.
-
-Example NCM_aab : forall a b, base a -> base b -> a ∙ a ∙ b = 0.
-Proof.
-  intros. prep_reification. reification_wrt.
-  solve_reification.
-Defined.
-
-Example NCM_aba : forall a b, base a -> a ∙ b ∙ a = a ∙ a ∙ b.
-Proof.
-  intros. prep_reification. reification_wrt. solve_reification.
-Qed.
-
-Example NCM_aabb : forall a b, base a -> base b -> a ∙ a = b ∙ b.
-Proof.
-  intros. prep_reification. reification_wrt. solve_reification.
-Qed. 
-
-Example NCM_abc : forall a b c, a ∙ b ∙ c = c ∙ a ∙ 1 ∙ b.   
-Proof.
-  intros. prep_reification. reification_wrt. 
-  (* find_permutation *)
-  apply interp_permutation. apply permutation_reflection. apply meq_multiplicity.
-   intros. repeat destruct H; trivial.
-Defined.
-
 (* Now to deal with evars!!! *)
 
 Ltac has_evars term := 
@@ -726,23 +684,69 @@ Ltac reification_wrt_evar :=
     replace ([Some ls2]) with ([ls2'] : A) by (simpl; reification)
   end.
 
-Lemma split_list : forall values ls1 ls2,
-  [index_wrt values (ls1 ++ ls2)] = [index_wrt values ls1] ∙ [index_wrt values ls2].
-Proof.
-  induction ls1; intros.
-  + simpl. rewrite NCM_unit_l. reflexivity.
-  + simpl in *. rewrite IHls1. rewrite NCM_assoc. reflexivity.
-Qed.  
-
-Lemma split_m : forall a1 a2 b1 b2, a1 = a2 -> b1 = b2 -> a1 ∙ b1 = a2 ∙ b2.
-Proof. intros; subst; reflexivity. Qed.
-
 Ltac reification' := 
   repos_evar;
   prep_reification_evar;
   reification_wrt_evar;
-  rewrite split_list;
-  apply split_m; [reification | reflexivity].
+  rewrite split_list; auto;
+  (apply split_m; [reification | reflexivity]).
+
+
+
+Section Examples.
+Variable A : Type.
+Variable NCM_A : `{NCM A}.
+Variable NCM_A_Laws : `{NCM_Laws A}.
+
+
+
+Example NCM_comm' : forall (a b : A), a ∙ b = b ∙ a.
+Proof.
+  intros.
+  prep_reification.
+  reification_wrt.
+  solve_reification.
+Defined.
+
+Example NCM_unit' : forall a, 1 ∙ a  = a.
+Proof. 
+  intros. prep_reification. 
+Defined.
+
+
+Example NCM_absorb' : forall a, 0 ∙ a = 0.
+Proof.
+  intros. prep_reification. 
+Defined.
+
+Example NCM_nilpotent' : forall a, base a -> a ∙ a = 0.
+Proof.
+  intros. prep_reification. reification_wrt. solve_reification.
+Defined.
+
+Example NCM_aab : forall a b, base a -> base b -> a ∙ a ∙ b = 0.
+Proof.
+  intros. prep_reification. reification_wrt.
+  solve_reification.
+Defined.
+
+Example NCM_aba : forall a b, base a -> a ∙ b ∙ a = a ∙ a ∙ b.
+Proof.
+  intros. prep_reification. reification_wrt. solve_reification.
+Qed.
+
+Example NCM_aabb : forall a b, base a -> base b -> a ∙ a = b ∙ b.
+Proof.
+  intros. prep_reification. reification_wrt. solve_reification.
+Qed. 
+
+Example NCM_abc : forall a b c, a ∙ b ∙ c = c ∙ a ∙ 1 ∙ b.   
+Proof.
+  intros. prep_reification. reification_wrt. 
+  (* find_permutation *)
+  apply interp_permutation. apply permutation_reflection. apply meq_multiplicity.
+   intros. repeat destruct H; trivial.
+Defined.
 
 
 Example NCM_evar : forall a b c, exists d, b = d -> a ∙ b ∙ c = c ∙ d ∙ a ∙ 1.   
