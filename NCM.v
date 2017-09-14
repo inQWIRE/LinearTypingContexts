@@ -771,7 +771,7 @@ End Examples.
 
 Unset Implicit Arguments.
 Class PMonoid (A : Type) :=
-  { one' : A ; m' : A -> A -> option A; base' : A -> Prop }.
+  { one' : A ; m' : A -> A -> option A; base' : A -> Type }.
 Print NCM_Laws.
 Class PMonoid_Laws (A : Type) `{PMonoid A} :=
   { PMonoid_unit : forall a, m' a one' = Some a ;
