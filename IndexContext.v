@@ -129,6 +129,21 @@ Proof.
     * simpl in H. contradiction. 
     * simpl in *. destruct o; simpl; auto.
       rewrite IHa; auto.
+  - induction a as [ | [a | ] ls1]; intros [ | [b | ] ls2] base_a base_b neq H; 
+      simpl in *; try contradiction.
+    admit.
+    
+    assert (neq' : ls1 <> ls2).
+    { intros H'. apply neq. rewrite H'. auto.
+    }
+    
+
+    destruct b as [ | o' ls2]; simpl in *; [contradiction | ].
+    destruct o as [a | ].
+
+    assert (o = o'). 
+    { destruct o; destruct o'; auto. simpl in *.
+    }
 Defined.
 
 (* Now option IdxCtx should be an NCM *)
