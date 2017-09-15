@@ -5,7 +5,7 @@ Require Import Sorting.PermutEq. (* Standard library *)
 
 
 (* Nilpotent Commutative Monoid *)
-Class NCM A :=
+Class NCM A `{CommMonoid A} :=
     { zero : A
     ; one  : A
     ; m    : A -> A -> A 
@@ -22,11 +22,12 @@ Class NCM_Laws A `{NCM A} :=
   ; NCM_absorb: forall a, a ∙ 0 = 0
   ; NCM_comm  : forall a b, a ∙ b = b ∙ a
   ; NCM_nilpotent : forall a, base a -> a ∙ a = 0
-  (* is this strictly necessary? *) (* also gives us ~ base 1 (NCM_base_1) *)
+
+  ; NCM_base : forall a b, base a -> base b -> a <> b -> a ∙ b <> 0
   ; NCM_base_0 : ~ base 0
   ; NCM_1_0 : 1 <> 0
 }.
-Hint Resolve NCM_unit NCM_absorb NCM_base_0 NCM_1_0.
+Hint Resolve NCM_unit NCM_absorb NCM_base NCM_base_0 NCM_1_0.
 
 Set Implicit Arguments.
 
@@ -80,11 +81,11 @@ Proof.
   rewrite H' in H; auto.
 Defined.
 
-Lemma base_neq_0 : forall a, base a -> a <> 0.
+
+Lemma merge_neq_0 : forall a b, base a -> base b -> a <> b -> a ∙ b <> 0.
 Proof.
-  intros a H H'.
-  rewrite H' in H.
-  apply NCM_base_0; auto.
+  intros a b base_a base_b neq_a_b H.
+  apply NCM_base in H; auto.
 Defined.
 
 (****************************)
@@ -445,6 +446,7 @@ Arguments in_index {A} {NCM_A} : rename.
 Arguments in_index_wrt {A} {NCM_A} : rename.
 Arguments duplicate_nilpotent {A} {NCM_A} {NCM_A_laws} : rename.
 
+Hint Resolve merge_neq_0.
 
 (***************************)
 (* Putting it all together *)
@@ -639,10 +641,10 @@ Ltac split_reify_wrt vs1 vs2 ls :=
   | nil => constr:((@nil nat, @nil nat))
   (* in subset vs1 *)
   | ?a :: ?ls' => let i := lookup a vs1 in
-                 let idx := split_reify_wrt vs1 vs2 ls' in
-                 match idx with 
-                 | (?l, ?r) => constr:((i :: l, r))
-                 end
+                  let idx := split_reify_wrt vs1 vs2 ls' in
+                  match idx with 
+                  | (?l, ?r) => constr:((i :: l, r))
+                  end
   (* not in subset vs1 *)
   | ?a :: ?ls' => let i := lookup a vs2 in
                  let idx := split_reify_wrt vs1 vs2 ls' in
@@ -780,7 +782,8 @@ Class PMonoid_Laws (A : Type) `{PMonoid A} :=
   { PMonoid_unit : forall a, m' a one' = Some a ;
     PMonoid_assoc : forall a b c, (do x ← m' b c; m' a x) = (do x ← m' a b; m' x c) ;
     PMonoid_comm : forall a b, m' a b = m' b a ;
-    PMonoid_nilpotence : forall a, base' a -> m' a a = None
+    PMonoid_nilpotence : forall a, base' a -> m' a a = None ;
+    PMonoid_base : forall a b, base' a -> base' b -> a <> b -> m' a b <> None
    }.
 
 Instance PMonoid_NCM {A} `{PMonoid A} : NCM (option A) :=
@@ -804,6 +807,9 @@ Proof.
   - destruct a; auto.
   - destruct a; destruct b; auto. apply PMonoid_comm.
   - destruct a; auto. intros X. apply PMonoid_nilpotence. exact X.
+  - destruct a; destruct b; intros; simpl in *; auto.
+    apply PMonoid_base; auto. 
+    intros eq. rewrite eq in *. contradiction.
   - auto.
   - simpl. inversion 1.
 Defined.
