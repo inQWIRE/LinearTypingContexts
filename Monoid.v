@@ -1,7 +1,9 @@
+Require Import HoTT.
 Require Import Monad.
-Require Import PermutSetoid.
-Require Import Sorting.Permutation.
-Require Import Sorting.PermutEq. (* Standard library *)  
+Require Import List.
+Require Import Multiset.
+Require Import Permutation.
+Require Import PermutationReflection.
 
 (* A partial commutative monoid is a monoid (1,m) with an undefined element 0. *)
 Class PCM A :=
@@ -11,7 +13,7 @@ Class PCM A :=
 
 Notation "⊥" := zero.
 Notation "⊤" := one.
-Notation "a ∙ b" := (m a b) (left associativity, at level 20).
+Notation "a ∙ b" := (m a b) (left associativity, at level 23).
 
 Class PCM_Laws A `{PCM A} :=
   { M_unit  : forall a, a ∙ ⊤ = a
@@ -221,8 +223,9 @@ Section CMonoid.
   Lemma split_list : forall values ls1 ls2,
       [[index_wrt values (ls1 ++ ls2)]] = [[index_wrt values ls1]] ∙ [[index_wrt values ls2]].
   Proof.
-    induction ls1; simpl; intros; auto. simpl in *.
-    rewrite IHls1. auto. 
+    induction ls1; simpl; intros; auto.
+    - rewrite M_unit_l; auto.
+    - simpl in *. rewrite IHls1. auto. 
   Qed.  
 
 
@@ -244,11 +247,11 @@ Section CMonoid.
   Lemma in_index : forall i a values,
       [[index values i]] = a -> a = ⊥ \/ In a values.
   Proof.
-    induction i; destruct values; intros; auto.
-    - simpl in H. right. left. auto.
-    - simpl in H. 
+    induction i; destruct values; intros H; simpl in H; auto.
+    - left. exact H^.
+    - right. left. exact H^.
+    - simpl. 
       destruct (IHi _ _ H); auto.
-      right. right. auto.
   Defined.
 
   Lemma in_index_wrt : forall a idx values,
@@ -259,7 +262,8 @@ Section CMonoid.
     - contradiction.
     - destruct pf_in as [pf_in | pf_in].
       * (* index values i = a implies In a values? not if a = 0... *)
-        apply (in_index i); auto.
+        apply (in_index i); simpl; auto. 
+        exact pf_in^.
       * apply IHidx; auto.
   Defined.
 
@@ -278,16 +282,17 @@ Section CMonoid.
     - rewrite IHpf1, IHpf2. reflexivity.
   Defined.
 
-  Lemma permutation_reflection : forall ls1 ls2,
-      @permutation nat _ PeanoNat.Nat.eq_dec ls1 ls2 -> Permutation ls1 ls2.
+
+  Lemma permutation_reflection : forall (ls1 ls2 : list nat),
+        permutation ls1 ls2 -> Permutation ls1 ls2.
   Proof.
-    intros. apply (permutation_Permutation PeanoNat.Nat.eq_dec); auto.
+    intros. About permutation_Permutation.
+    apply (@permutation_Permutation nat decidable_paths_nat); auto.
   Defined.
 
-  Require Import Multiset. About list_contents.
-  Require Import Arith.
+  Require Import Multiset. 
 
-  Notation contents := (list_contents eq Nat.eq_dec).
+  Notation contents := (@list_contents nat decidable_paths_nat).
 
   Lemma meq_multiplicity : forall (ls1 ls2 : list nat),
       (forall x, In x ls1 \/ In x ls2 ->
@@ -295,8 +300,8 @@ Section CMonoid.
       meq (contents ls1) (contents ls2).
   Proof.
     intros ls1 ls2 H x.
-    destruct (in_dec Nat.eq_dec x ls1); [apply H; auto | ].
-    destruct (in_dec Nat.eq_dec x ls2); [apply H; auto | ].
+    destruct (in_dec x ls1); [apply H; auto | ].
+    destruct (in_dec x ls2); [apply H; auto | ].
     repeat rewrite multiplicity_In_O; auto. 
   Defined.
 
@@ -305,7 +310,7 @@ Section CMonoid.
   Fixpoint find_duplicate (ls : list nat) : option nat :=
     match ls with
     | nil => None
-    | n :: ls' => if in_dec Nat.eq_dec n ls' then Some n 
+    | n :: ls' => if in_dec n ls' then Some n 
                   else find_duplicate ls'
     end.
 
@@ -322,7 +327,7 @@ Section CMonoid.
     induction ls; intros pf_in; simpl in *.
     - contradiction.
     - destruct pf_in as [eq | pf_in].
-      * rewrite eq. auto.  
+      * rewrite <- eq. auto.
       * rewrite IHls; auto.
   Defined.
 
@@ -368,9 +373,9 @@ Ltac simpl_arg e := let e' := fresh "e" in
 
 Ltac destruct_finite_In :=
   repeat match goal with
-  | [ H : In _ _ \/ In _ _ |- _ ] => destruct H
-  | [ H : In _ nil |- _ ] => apply (False_rect _ H)
-  | [ H : In ?a (_ :: _) |- _ ] => destruct H; try (subst; reflexivity)
+  | [ H : In _ _ + In _ _ |- _ ] => destruct H
+  | [ H : In _ nil |- _ ] => apply (Empty_rec H)
+  | [ H : In ?a (_ :: _) |- _ ] => destruct H as [H | H]; try (rewrite H; reflexivity)
   end.
 
 
@@ -501,13 +506,21 @@ Ltac solve_permutation :=
   intros; destruct_finite_In;
   fail.
 
+Ltac replace_in e e' tac :=
+  match goal with
+  | [ |- context[ e ] ] => let H := fresh "H" in
+                           assert (H : e = e') by tac;
+                           rewrite H;
+                           clear H
+  end.
+
 
 (* This tactic finds fragments [[Some a]] and replaces them with [[a]] *)
 Ltac strip_Some :=
   let A := type_of_goal in
   repeat match goal with
   | [ |- context[ [[Some ?a]] ] ] => 
-    replace ([[Some a]]) with ([[a]] : A) by auto
+    replace_in ([[Some a]] : A) ([[a]] : A) auto
   end.
 
 Ltac knot_reification tac := 
@@ -535,8 +548,8 @@ Ltac reification_wrt :=
     let idx1  := reify_wrt src ls1 in (* indices of ls1 *)
     let idx2_1 := reify_wrt src ls2_1 in (* indices of ls2 that are not in ls1 *)
     let idx2' := constr:(index_wrt src (idx1 ++ idx2_1)) in
-    replace ([[ls2]]) with ([[idx2']] : A) 
-      by (simpl_args; strip_Some; reification_wrt; solve_permutation);
+    let tac := (simpl_args; strip_Some; reification_wrt; solve_permutation) in
+    replace_in ([[ls2]] : A) ([[idx2']] : A) tac; 
     rewrite split_list; auto
   end.
 
@@ -552,7 +565,7 @@ Variable PCM_A_Laws : `{PCM_Laws A}.
 
 Example PCM_comm' : forall (a b : A), a ∙ b = b ∙ a.
 Proof.
-  intros. monoid. 
+  intros. monoid.
 Defined.
 
 Example PCM_unit' : forall a, ⊤ ∙ a  = a.

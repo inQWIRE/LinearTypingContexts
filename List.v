@@ -6,6 +6,16 @@ Section List.
 
 Variable A : Type.
 
+(**********)
+(* Length *)
+(**********)
+Open Scope list_scope.
+Fixpoint length (l : list A) : nat :=
+  match l with
+  | nil => 0
+  | _ :: l' => S (length l')
+  end.
+
 (***********)
 (* In List *)
 (***********)

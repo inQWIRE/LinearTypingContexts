@@ -159,3 +159,4 @@ Defined.
 End Permut.
 
 Arguments list_contents {A} {decA}.
+Arguments permutation {A} {decA}.

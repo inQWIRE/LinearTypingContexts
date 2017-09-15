@@ -269,7 +269,7 @@ Proof.
 Defined.
 
 About permutation.
-Arguments permutation {A} {decA}.
+
 Lemma permutation_reflection : forall (ls1 ls2 : list nat),
       permutation ls1 ls2 -> Permutation ls1 ls2.
 Proof.
