@@ -29,6 +29,42 @@ Hint Resolve M_unit M_assoc M_comm M_absorb.
 Class Translate (A B : Type) := { translate : A -> B }.
 Notation "[[ b ]]" := (translate b).
 
+(**********************************)
+(* Lift a partial monoid to a PCM *)
+(**********************************)
+
+Class PPCM A :=
+  { one' : A 
+  ; m' : A -> A -> option A }.
+Class PPCM_Laws A `{PPCM A} :=
+  { PMonoid_unit : forall a, m' a one' = Some a ;
+    PMonoid_assoc : forall a b c, (do x ← m' b c; m' a x) = (do x ← m' a b; m' x c) ;
+    PMonoid_comm : forall a b, m' a b = m' b a 
+  }.
+
+Instance PPCM_to_PCM A `{PPCM A} : PCM (option A) :=
+  { one := Some one'
+  ; zero := None
+  ; m := fun a b => do x ← a;
+                    do y ← b;
+                    m' x y
+  }.
+Instance PPCM_to_PCM_Laws A `{PPCM_Laws A} : PCM_Laws (option A).
+Proof.
+  split.
+  - destruct a; simpl; auto. apply PMonoid_unit.
+  - destruct a as [a | ], b as [b | ], c as [c | ]; simpl; auto. 
+    * apply PMonoid_assoc. 
+    * destruct (m' a b); auto.
+  - destruct a as [a | ], b as [b | ]; simpl; auto.
+    apply PMonoid_comm.
+  - destruct a; simpl; auto.
+Qed.
+
+(*******************)
+(* CMonoid Section *)
+(*******************)
+
 Section CMonoid.
   Variable A : Type.
   Variable PCM_A : `{PCM A}.

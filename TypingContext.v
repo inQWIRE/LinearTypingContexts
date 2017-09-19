@@ -1,32 +1,26 @@
 Require Import Monad.
 Require Import Monoid.
 
-(*
-Class TypingCtx_Laws X A Ctx `{PCM_Ctx : PCM_Laws Ctx} :=
-  { singleton : X -> A -> Ctx
-  ; Ctx_rect : forall (P : Ctx -> Type)
-                      (P_bot : P ⊥)
-                      (P_top : P ⊤)
-                      (P_singleton : forall x a, P (singleton x a))
-                      (P_merge : forall Γ1 Γ2, P Γ1 -> P Γ2 -> P (Γ1 ∙ Γ2))
-                      (Γ : Ctx), P Γ
-  }
-  .*)
-
 Class TypingContext (X A Ctx : Type) :=
   { singleton : X -> A -> Ctx
   ; validity : Ctx -> bool
-(*  ; in_dom : X -> Ctx -> bool*)
   }.
 
-(*
-Infix "XOR" := xorb (at level 30) : bool_scope.
-Infix "∈?" := in_dom (at level 25).
-Notation "x ∈ Γ" := (x ∈? Γ = true) (at level 50).
-Notation "x ∉ Γ" := (x ∈? Γ = false) (at level 50).
-Notation "x ∉? Γ" := (negb (x ∈? Γ)) (at level 25).
+(* partial typing context *)
+Class PTypingContext (X A PCtx : Type) :=
+  { singleton' : X -> A -> PCtx }.
 
-*)
+Definition is_Some {Z} (x : option Z) := match x with
+                        | Some _ => true
+                        | None => false
+                        end.
+
+Instance PTypingCtx_to_TypingCtx X A PCtx `{PTypingContext X A PCtx} 
+    : TypingContext X A (option PCtx) :=
+  { singleton := fun x a => Some (singleton' x a)
+  ; validity := is_Some
+  }.
+
 Open Scope bool_scope.
 
 Class DecidablePaths X := {decPaths : forall (x y : X), {x = y} + {x <> y}}.
@@ -77,7 +71,41 @@ Class TypingContext_Laws X A Ctx `{DecidablePaths X}
   ; validity_top : validity ⊤ = true
   ; validity_singleton_merge : forall x y a b, 
     validity (singleton x a ∙ singleton y b) = (x <>? y)
+  }. 
+
+Class PTypingContext_Laws X A Ctx `{DecidablePaths X}
+                                  `{PPCM_Ctx : PPCM_Laws Ctx}
+                                  `{PTypingContext X A Ctx} :=
+  { pvalidity3 : forall Γ1 Γ2 Γ3,
+        is_Some (do Γ ← m' Γ1 Γ2; m' Γ Γ3)
+      = is_Some (m' Γ1 Γ2) && is_Some (m' Γ1 Γ3) && is_Some (m' Γ2 Γ3)
+  ; validity_singleton_merge' : forall x y a b,
+    m' (singleton' x a) (singleton' y b) = None <-> x = y
   }.
+
+
+Instance PTypingContext_to_TypingContext_Laws X A Ctx `{PTypingContext_Laws X A Ctx}
+                                            : TypingContext_Laws X A (option Ctx).
+Proof.
+  split.
+  - destruct Γ1 as [Γ1 | ], Γ2 as [Γ2 | ], Γ3 as [Γ3 | ]; auto.
+    * apply pvalidity3.
+    * assert (merge_None : forall z, validity (Some z ∙ None) = false) by auto.
+      rewrite merge_None.
+      rewrite Bool.andb_false_r.
+      simpl. destruct (m' Γ1 Γ2); auto.
+  - destruct Γ; auto.
+    * simpl. split; inversion 1.
+    * simpl. split; auto.
+  - intros; simpl; auto.
+  - simpl; auto.
+  - intros. simpl. unfold bdec.
+    destruct (decPaths x y) as [eq | neq]; auto.
+    * apply (validity_singleton_merge' x y a b) in eq.
+      rewrite eq. auto.
+    * destruct (m' (singleton' x a) (singleton' y b)) as [ | z] eqn:eq'; auto.
+      apply (validity_singleton_merge') in eq'. contradiction.
+Qed.
 
 Section TypingContexts.
 
@@ -150,10 +178,11 @@ Arguments is_valid {X A Ctx TypingContext} : rename.
 
 (* This is the naive tactic, but instead of working top down, we want to be a little smarter by working bottom up *)
 Ltac validate_dumb :=
+  repeat rewrite M_unit; repeat rewrite M_unit_l;
   repeat match goal with
   | [ H : is_valid ?Γ |- is_valid ?Γ ]              => exact H
   | [ |- is_valid ⊤ ]                               => apply top_is_valid
-  | [ |- is_valid (singleton _ _) ]                 => apply singleton_is_valid
+  | [ |- is_valid (singleton _ _) ]                 => eapply singleton_is_valid; auto
   | [ |- is_valid (singleton _ _ ∙ singleton _ _) ] => eapply singleton_merge_is_valid; auto
   | [ |- is_valid (_ ∙ _ ∙ _) ]                     => eapply is_valid3; auto
   | [ |- _ /\ _]                                    => split
@@ -219,7 +248,7 @@ End Tests.
 Notation "Γ1 ⊎ Γ2 == Γ" := (Γ = Γ1 ∙ Γ2 /\ is_valid Γ) (at level 75).
 
 Ltac solve_ctx := 
-  match goal with
+  repeat match goal with
   | [ |- _ /\ _ ] => split
   | [ |- is_valid ?Γ ] => validate
   | [ |- _ = _ ] => monoid
