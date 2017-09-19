@@ -102,6 +102,8 @@ endif
 ######################
 
 VFILES:=Monad.v\
+  Monoid.v\
+  TypingContext.v\
   NCM.v\
   ListContext.v\
   IndexContext.v

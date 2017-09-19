@@ -5,7 +5,7 @@ Require Import Sorting.PermutEq. (* Standard library *)
 
 
 (* Nilpotent Commutative Monoid *)
-Class NCM A `{CommMonoid A} :=
+Class NCM A :=
     { zero : A
     ; one  : A
     ; m    : A -> A -> A 
