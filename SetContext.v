@@ -1,7 +1,8 @@
 Require Import HoTT.
 Require Import Monad.
 Require Import Permutation.
-Require Import NCM.
+Require Import Monoid.
+Require Import TypingContext.
 
 Instance hset_option : forall B, IsHSet B -> IsHSet (option B).
 Admitted.
@@ -274,7 +275,6 @@ Proof.
 Defined.
 End add.
 
-Section merge.
 
 Fixpoint append ls1 ls2 : list A :=
   match ls1 with
@@ -300,6 +300,10 @@ Defined.
 Arguments empty {A}.
 Notation "∅" := empty.
 Notation "X ∪ Y" := (merge X Y) (at level 40).
+
+Section merge.
+
+
 
 (*Lemma merge_correct : (from_list ls1) ⋓ (from_list ls2) = Some ( *)
 (* Properties of merge: *)
@@ -464,6 +468,9 @@ Lemma disjoint_list_correct : forall ls1 ls2,
       disjoint_list ls1 ls1' = disjoint_list ls2 ls2'.
 Admitted.
 
+Lemma disjoint_list_nil_r : forall ls, disjoint_list ls nil = true.
+Proof. induction ls; auto. Qed.
+
 
 Definition disjoint : set A -> set A -> Bool.
 Proof.
@@ -472,28 +479,38 @@ Proof.
 Defined.
 
 End disjoint.
-Notation "X ⊥ Y" := (disjoint X Y) (right associativity, at level 46).
+Notation "X ⊥⊥ Y" := (disjoint X Y) (right associativity, at level 46).
+
 Open Scope bool_scope.
 
-Lemma disjoint_nilpotent : forall a, a <> empty -> a ⊥ a = false.
+Lemma disjoint_nilpotent : forall a, a <> empty -> a ⊥⊥ a = false.
 Admitted.
 
-Lemma disjoint_comm : forall a b, a ⊥ b = b ⊥ a.
-Admitted.
-
-
-Lemma disjoint_merge_r : forall a b c, a ⊥ (merge b c) = (a ⊥ b) && (a ⊥ c).
-Admitted.
-
-Lemma disjoint_merge_l : forall a b c, (merge a b) ⊥ c = (a ⊥ c) && (b ⊥ c).
+Lemma disjoint_comm : forall a b, a ⊥⊥ b = b ⊥⊥ a.
 Admitted.
 
 
+Lemma disjoint_merge_r : forall a b c, a ⊥⊥ (merge b c) = (a ⊥⊥ b) && (a ⊥⊥ c).
+Admitted.
+
+Lemma disjoint_merge_l : forall a b c, (merge a b) ⊥⊥ c = (a ⊥⊥ c) && (b ⊥⊥ c).
+Admitted.
+
+Lemma singleton_disjoint : forall a b, 
+      singleton_set a ⊥⊥ singleton_set b = negb (a R? b).
+Proof. intros. simpl. destruct (a R? b); auto. Qed.
+
+
+Lemma merge_append : forall ls1 ls2, 
+      (from_list ls1) ∪ (from_list ls2) = from_list (ls1 ++ ls2).
+Proof.
+  induction ls1 as [ | x1 ls1]; intros; auto.
+Qed.
 
 
 (* PROPERTIES *)
 
-Lemma disjoint_empty : forall X, X ⊥ empty = true.
+Lemma disjoint_empty : forall X, X ⊥⊥ empty = true.
 Proof.
   apply set_ind; auto.
   induction ls; auto.
@@ -560,7 +577,6 @@ End defns.
 
 
 Arguments empty {A}.
-Notation "X ⊥_{ R } Y" := (@disjoint _ R _ _ _ _ _ X Y) (right associativity, at level 46).
 Notation "∅" := empty.
 Notation "X ∪ Y" := (merge X Y) (at level 40).
 
@@ -577,6 +593,9 @@ Context `{decX : DecidablePaths X}.
 
 Definition R (z1 z2 : X * A) : Type :=
   (fst z1) = (fst z2).
+
+Notation "X ⊥⊥ Y" := (@disjoint _ R _ _ _ _ _ X Y) (right associativity, at level 46).
+
 Hint Unfold R.
 Instance decR : forall (z1 z2 : X * A), 
     Decidable (R z1 z2).
@@ -585,16 +604,16 @@ Proof.
 Defined.
 
 About merge.
-Instance reflexiveR : Reflexive R.
+Global Instance reflexiveR : Reflexive R.
 Proof.
   intros [x a]. unfold R. auto.
 Defined.
-Instance symmetricR : Symmetric R.
+Global Instance symmetricR : Symmetric R.
 Proof.
   intros [x a] [y b]. unfold R.
   simpl; intros eq; exact (eq^).
 Defined.
-Instance transitiveR : Transitive R.
+Global Instance transitiveR : Transitive R.
 Proof.
   intros [x a] [y b] [z c]. unfold R.
   simpl.
@@ -610,6 +629,13 @@ Proof.
   exact (if b then Some (Γ1 ∪ Γ2) else None).
 Defined.
 
+Ltac true_false_contradiction :=
+  match goal with
+  | [ H : true = false |- _ ] => exact (Empty_rec (true_ne_false H))
+  | [ H : false = true |- _ ] => exact (Empty_rec (false_ne_true H))
+  end.
+
+
 Open Scope bool_scope.
 Lemma andb_true_r : forall b, b && true = b.
 Proof. destruct b; auto.
@@ -618,12 +644,40 @@ Defined.
 Lemma andb_false_r : forall b, b && false = false.
 Proof. destruct b; auto. Defined.
 
+Lemma ifb_eta : forall (b : Bool), (if b then true else false) = b.
+Proof.  destruct b; auto. Defined.
 
-Global Instance PMonoid_set : PMonoid (PreCtx X) :=
+Lemma andb_true_inv1 : forall b1 b2, b1 && b2 = true -> b1 = true.
+Proof. destruct b1; auto. Defined.
+
+Lemma andb_true_inv2 : forall b1 b2, b1 && b2 = true -> b2 = true.
+Proof. destruct b2; auto. destruct b1; auto. Defined.
+
+Lemma negb_or : forall b1 b2, negb (b1 || b2) = negb b1 && negb b2.
+Proof.
+  destruct b1, b2; auto.
+Qed.
+
+Lemma negb_and : forall b1 b2, negb (b1 && b2) = negb b1 || negb b2.
+Proof. destruct b1, b2; auto. Qed.
+
+Lemma andb_orb_r : forall b1 b2 b3, b1 && (b2 || b3) = (b1 && b2) || (b1 && b3).
+Proof.
+Admitted.
+
+Lemma andb_orb_l : forall b1 b2 b3, (b1 || b2) && b3 = (b1 && b3) || (b2 && b3).
+Proof.
+Admitted.
+
+
+Lemma andb_assoc : forall b1 b2 b3, b1 && (b2 && b3) = (b1 && b2) && b3.
+Proof. destruct b1, b2, b3; auto. Qed.
+
+Global Instance PPCM_set : PPCM (PreCtx X) :=
   { one' := ∅
-  ; m' := disjoint_merge
-  ; base' := fun x => x <> empty }.
-Global Instance PMonoid_set_laws : PMonoid_Laws (PreCtx X).
+  ; m' := disjoint_merge }.
+
+Global Instance PPCM_set_laws : PPCM_Laws (PreCtx X).
 Proof.
   split.
   - unfold m'. simpl. 
@@ -635,8 +689,8 @@ Proof.
   - intros. 
     unfold m'; simpl.
     unfold disjoint_merge.
-    remember (b ⊥_{R} c) as disj_b_c eqn:H_b_c.
-    remember (a ⊥_{R} b) as disj_a_b eqn:H_a_b.
+    remember (b ⊥⊥ c) as disj_b_c eqn:H_b_c.
+    remember (a ⊥⊥ b) as disj_a_b eqn:H_a_b.
     destruct disj_a_b; destruct disj_b_c; simpl; auto.
     * rewrite disjoint_merge_r.
       rewrite disjoint_merge_l.
@@ -654,11 +708,83 @@ Proof.
     rewrite disjoint_comm.
     rewrite merge_comm.
     reflexivity.
-  - unfold m'; simpl; unfold disjoint_merge.
-    intros.
-    rewrite disjoint_nilpotent; auto.
 Defined.
+
+
+Section merge_disjoint3.
+  About set_ind3.
+  Let P (Γ1 Γ2 Γ3 : set (X * A)) := 
+      Γ1 ∪ Γ2 ⊥⊥ Γ3 = (Γ1 ⊥⊥ Γ3) && (Γ2 ⊥⊥ Γ3).
+(*(Γ1 ⊥⊥ Γ2) && (Γ1 ∪ Γ2 ⊥⊥ Γ3) = (Γ1 ⊥⊥ Γ2) && (Γ1 ⊥⊥ Γ3) && (Γ2 ⊥⊥ Γ3)*)
+  Let H : forall Γ1 Γ2 Γ3, IsHProp (P Γ1 Γ2 Γ3). intros. auto.
+    unfold P. auto. 
+  Qed.
+
+  Let P_list : forall ls1 ls2 ls3, P (from_list ls1) (from_list ls2) (from_list ls3).
+  Proof.
+    induction ls1 as [ | [x1 a1] ls1]; 
+    destruct ls2 as [ | [x2 a2] ls2], ls3 as [ | [x3 a3] ls3]; unfold P; 
+    simpl; intros; auto.
+    - rewrite append_nil_r.
+      rewrite disjoint_list_nil_r.
+      auto.
+    - unfold b_decR, decR; simpl.
+      rewrite append_nil_r.
+      rewrite andb_true_r.
+      reflexivity.
+    - repeat rewrite disjoint_list_nil_r. auto.
+    - unfold b_decR, decR in *; simpl in *.
+      unfold P in IHls1; simpl in IHls1.
+      destruct (decX x1 x2); simpl in *.
+      * (* x1 = x2 *) HoTT_subst. 
+        rewrite IHls1. simpl. 
+        unfold b_decR; simpl.
+        destruct (decX x1 x3); simpl; auto.
+        repeat rewrite andb_assoc. reflexivity.
+      * (* x2 <> x2 *)
+        destruct (decX x1 x3); simpl; auto.
+        rewrite IHls1. simpl.
+        unfold b_decR; simpl.
+        repeat rewrite andb_assoc. reflexivity.
+  Qed.
+
+
+  Lemma merge_disjoint3 : forall Γ1 Γ2 Γ3, P Γ1 Γ2 Γ3. 
+  Proof. 
+    exact (set_ind3 P H P_list).
+  Qed.
+End merge_disjoint3.
+
+
+Global Instance PTypingContext_set : PTypingContext X A (PreCtx X) :=
+  { singleton' := fun x a => singleton_set (x,a) }.
+Global Instance PTypingContext_set_Laws : PTypingContext_Laws X A (PreCtx X).
+Proof.
+  split.
+  - intros; simpl. unfold disjoint_merge. 
+    remember (Γ1 ⊥⊥ Γ2) as b12 eqn:H12.
+    remember (Γ1 ⊥⊥ Γ3) as b13 eqn:H13.
+    remember (Γ2 ⊥⊥ Γ3) as b23 eqn:H23.
+    apply (@Overture.concat _ _ (b12 && ((Γ1 ∪ Γ2) ⊥⊥ Γ3))).
+    { destruct b12; auto. simpl. destruct (Γ1 ∪ Γ2 ⊥⊥ Γ3); auto. }
+    apply (@Overture.concat _ _ (b12 && b13 && b23));
+      [ | destruct b12, b13, b23; auto].
+    HoTT_subst.
+    rewrite merge_disjoint3.
+    repeat rewrite andb_assoc.
+    reflexivity.
+  - unfold m'. simpl.
+    intros.
+    unfold disjoint_merge.
+    rewrite singleton_disjoint. unfold b_decR, decR. simpl.
+    destruct (decX x y); simpl; auto.
+    * split; auto.
+    * split; intros contr;
+      [exact (Empty_rec (Some_neq_None contr)) | contradiction].
+Qed.
+
 End SetContext.    
+
     
 
 (* So option(PreCtx X) is an NCM *)
@@ -679,13 +805,12 @@ Defined.
 Instance CtxF {A} : Functor (fun Z => Ctx Z A) := {fmap := @fmap_Ctx A}.
 
 Section Ctx_ind.
-  About set_ind.
   Variable A : Type.
   Variable X : Type.
   Variable decX : `{DecidablePaths X}.
   Variable P : Ctx X A -> Type.
   Variable P_HProp : forall Γ, IsHProp (P Γ).
-  Variable P_None : P 0.
+  Variable P_None : P ⊥.
   Variable P_Some  : forall ls, P (Some (from_list ls)).
   Definition Ctx_ind : forall Γ, P Γ.
   Proof.
@@ -695,6 +820,27 @@ Section Ctx_ind.
 End Ctx_ind.
 About Ctx_ind.
 Arguments Ctx_ind {A X decX}.
+
+Section Ctx_ind2.
+  Variable A : Type.
+  Variable X : Type.
+  Variable decX : `{DecidablePaths X}.
+  Variable P : Ctx X A -> Ctx X A -> Type.
+  Variable P_HProp : forall Γ1 Γ2, IsHProp (P Γ1 Γ2).
+  Variable P_None_None : P ⊥ ⊥.
+  Variable P_None_Some : forall ls, P ⊥ (Some (from_list ls)).
+  Variable P_Some_None : forall ls, P (Some (from_list ls)) ⊥.
+  Variable P_Some_Some : forall ls1 ls2, P (Some (from_list ls1)) (Some (from_list ls2)).
+  Definition Ctx_ind2 : forall Γ1 Γ2, P Γ1 Γ2.
+  Proof.
+    destruct Γ1 as [ Γ1 | ], Γ2 as [Γ2 | ].
+    - generalize dependent Γ1; generalize dependent Γ2. 
+      apply set_ind2; auto.
+    - generalize dependent Γ1. apply set_ind; auto.
+    - generalize dependent Γ2. apply set_ind; auto.
+    - exact P_None_None.
+  Defined.
+End Ctx_ind2.
 
 Section Ctx_rec.
   About set_rec.
@@ -716,6 +862,10 @@ Section Ctx_rec.
   Defined.
 End Ctx_rec.
 
+
+Notation "X ⊥⊥ Y" := (@disjoint _ (@R _ _) _ _ _ _ _ X Y) (right associativity, at level 46).
+
+
 Section CtxFunctor.
 
 Variable A X Y : Type.
@@ -735,28 +885,39 @@ Proof.
   induction ls; auto.
 Defined.
 
+Lemma from_list_cons : forall Y `{DecidablePaths Y} (y : Y) (a : A) (ls : list (Y * A)),
+                  Some (from_list ((y,a) :: ls)) = disjoint_merge (singleton_set (y,a)) (from_list ls).
+Admitted.
+
+Lemma fmap_singleton_merge : forall (x : X) a (Γ : Ctx X A),
+                       fmap f (singleton x a ∙ Γ) = singleton (f x) a ∙ fmap f Γ.
+Proof.
+  intros.
+  simpl.
+  destruct Γ; auto. simpl. unfold singleton_set. unfold disjoint_merge.
+  set (b := from_list ((x,a) :: nil) ⊥⊥ p).
+Admitted.
+
 Lemma fmap_merge : forall (Γ1 Γ2 : Ctx X A),
                    fmap f (Γ1 ∙ Γ2) = fmap f Γ1 ∙ fmap f Γ2.
 Proof.
-  intros Γ1. 
-  apply Ctx_ind; auto. 
-  * admit.
-  * assert (zero_r : forall Z `{DecidablePaths Z} (Γ : Ctx Z A), Γ ∙ 0 = 0).  admit.
-    assert (fmap_0 : fmap f (0 : Ctx X A) = (0 : Ctx Y A)). 
-      { simpl. unfold fmap_Ctx. simpl. reflexivity. }
-    rewrite zero_r.   
-    rewrite fmap_0.
-    rewrite zero_r.
+  eapply Ctx_ind2; eauto.
+  - admit (* not IsHProp? *).
+  - intros.
+    repeat rewrite fmap_from_list. 
+    generalize dependent ls2.
+    induction ls1 as [ | [x1 a1] ls1]; intros ls2; try (simpl; auto; fail).
+    erewrite from_list_cons. 
+    assert (eq : disjoint_merge (singleton_set (x1,a1)) (from_list ls1) 
+               = singleton x1 a1 ∙ Some (from_list ls1)) by auto.
+    rewrite eq.
+    rewrite <- M_assoc.
+    rewrite fmap_singleton_merge.
+    rewrite IHls1. 
+    rewrite M_assoc. f_ap.
+    simpl. unfold f' at 2. simpl.
+    erewrite from_list_cons.
     reflexivity.
-  * intros ls2. generalize dependent Γ1.
-    apply Ctx_ind; auto. 
-    + admit.
-    + intros ls1.
-      rewrite fmap_from_list.
-      rewrite fmap_from_list.
-      unfold m. simpl.
-      unfold disjoint_merge.
-  (* TODO *)
 Admitted.
 
 Lemma fmap_singleton : forall (x : X) (a : A),

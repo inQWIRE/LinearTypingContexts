@@ -35,7 +35,7 @@ Class NCM_Laws A `{NCM A} :=
   ; NCM_base_0 : ~ base 0
   ; NCM_1_0 : 1 <> 0
 }.
-Hint Resolve NCM_unit NCM_absorb NCM_base_0 NCM_1_0.
+Hint Resolve NCM_unit NCM_absorb  NCM_base_0 NCM_1_0.
 
 
 
@@ -92,12 +92,10 @@ Proof.
   rewrite H' in H; auto.
 Defined.
 
-Lemma base_neq_0 : forall a, base a -> a <> 0.
+
+Lemma merge_neq_0 : forall a b, base a -> base b -> a <> b -> a ∙ b <> 0.
 Proof.
-  intros a H H'.
-  rewrite H' in H.
-  apply NCM_base_0; auto.
-Defined.
+Admitted.
 
 (****************************)
 (* Interpretable type class *)
@@ -390,6 +388,19 @@ Proof.
     * simpl. rewrite IHidx; auto.
       exists i. split; auto.
 Defined.
+
+
+Lemma split_list : forall values ls1 ls2,
+  [index_wrt values (ls1 ++ ls2)] = [index_wrt values ls1] ∙ [index_wrt values ls2].
+Proof.
+  induction ls1; intros.
+  + simpl. rewrite NCM_unit_l. reflexivity.
+  + simpl in *. rewrite IHls1. rewrite NCM_assoc. reflexivity.
+Qed.  
+
+Lemma split_m : forall a1 a2 b1 b2, a1 = a2 -> b1 = b2 -> a1 ∙ b1 = a2 ∙ b2.
+Admitted.
+
   
 (********************************)
 (* Proving properties are not 0 *)
@@ -422,6 +433,7 @@ Arguments in_index {A} {NCM_A} : rename.
 Arguments in_index_wrt {A} {NCM_A} : rename.
 Arguments duplicate_nilpotent {A} {NCM_A} {NCM_A_laws} : rename.
 
+Hint Resolve merge_neq_0.
 
 (***************************)
 (* Putting it all together *)
@@ -585,6 +597,98 @@ Ltac reification := prep_reification; reification_wrt; solve_reification.
 (* This doesn't account for EVARs yet *)
 
 
+Ltac has_evars term := 
+  match term with
+    | ?L = ?R        => has_evar L; has_evar R
+    | ?L = ?R        => has_evars L
+    | ?L = ?R        => has_evars R
+    | ?Γ1 ∙ ?Γ2      => has_evar Γ1; has_evar Γ2
+    | ?Γ1 ∙ ?Γ2      => has_evars Γ1
+    | ?Γ1 ∙ ?Γ2      => has_evars Γ2
+  end.
+
+Ltac repos_evar :=
+  repeat match goal with 
+  | [ |- ?G ] => has_evars G; fail 1
+  | [ |- ?a = ?b ] => has_evar b; symmetry 
+  | [ |- context[?a ∙ ?b]] => has_evar a; rewrite (NCM_comm a b)
+  end;
+  repeat match goal with 
+  | [ |- ?a ∙ (?b ∙ ?c) = _ ] => rewrite (NCM_assoc a b c)
+  end.
+  
+Ltac rm_evar ls :=
+  match ls with
+  | nil => nil 
+  | ?a :: ?ls' => let ls'' := rm_evar ls' in constr:(a :: ls'')
+  | ?a :: ?ls' => ls' (* I cannot believe this works. Jeez. *)
+  end.
+
+Ltac split_reify_wrt vs1 vs2 ls :=
+  match ls with
+  | nil => constr:((@nil nat, @nil nat))
+  (* in subset vs1 *)
+  | ?a :: ?ls' => let i := lookup a vs1 in
+                  let idx := split_reify_wrt vs1 vs2 ls' in
+                  match idx with 
+                  | (?l, ?r) => constr:((i :: l, r))
+                  end
+  (* not in subset vs1 *)
+  | ?a :: ?ls' => let i := lookup a vs2 in
+                 let idx := split_reify_wrt vs1 vs2 ls' in
+                 match idx with 
+                 | (?l, ?r) => constr:((l, i :: r))
+                 end
+  end.
+  
+
+Ltac simpl_args_evar :=
+  match goal with
+  [ |- [ ?e1 ] ∙ ?ev = [ ?e2 ] ] => 
+                          let H1 := fresh "H" in
+                          let H2 := fresh "H" in
+                          let x1 := fresh "x" in
+                          let x2 := fresh "x" in
+                          remember e1 as x1 eqn:H1; 
+                          remember e2 as x2 eqn:H2;
+                          simpl in H1, H2;
+                          rewrite <- H1, <- H2 in *; clear x1 x2 H1 H2
+ end.
+
+Ltac prep_reification_evar := 
+  match goal with
+  | [ |- ?a1 ∙ ?ev = ?a2 ] => 
+    let A := type of a1 in
+    let e1 := reify A a1 in
+    let e2 := reify A a2 in
+    change (([e1] : A) ∙ ev = ([e2] : A));
+    repeat rewrite flatten_correct; auto;
+    simpl_args_evar  
+  end.
+
+Ltac reification_wrt_evar :=
+  let A := type_of_goal in
+  match goal with
+  | [ |- [Some ?ls1] ∙ ?ev = [Some ?ls2] ] =>
+    let sub := ls1 in
+    let super := append sub ls2 in 
+    let idx := split_reify_wrt sub super ls2 in
+    let ls2' := match idx with
+                | (?idx2, ?idx3) => constr:(index_wrt super (idx2 ++ idx3))
+                end in
+    apply (@Overture.concat A _ ([ls2'] : A));
+      [ | simpl; reification]
+  end.
+
+Ltac reification' := 
+  repos_evar;
+  prep_reification_evar;
+  reification_wrt_evar;
+  rewrite split_list; auto;
+  (apply split_m; [reification | reflexivity]).
+
+
+
 Section Examples.
 Variable A : Type.
 Variable NCM_A : `{NCM A}.
@@ -637,113 +741,9 @@ Proof.
   intros. prep_reification. reification_wrt. solve_reification. 
 Defined.
 
-(* Now to deal with evars!!! *)
-
-Ltac has_evars term := 
-  match term with
-    | ?L = ?R        => has_evar L; has_evar R
-    | ?L = ?R        => has_evars L
-    | ?L = ?R        => has_evars R
-    | ?Γ1 ∙ ?Γ2      => has_evar Γ1; has_evar Γ2
-    | ?Γ1 ∙ ?Γ2      => has_evars Γ1
-    | ?Γ1 ∙ ?Γ2      => has_evars Γ2
-  end.
-
-Ltac repos_evar :=
-  repeat match goal with 
-  | [ |- ?G ] => has_evars G; fail 1
-  | [ |- ?a = ?b ] => has_evar b; symmetry 
-  | [ |- context[?a ∙ ?b]] => has_evar a; rewrite (NCM_comm a b)
-  end;
-  repeat match goal with 
-  | [ |- ?a ∙ (?b ∙ ?c) = _ ] => rewrite (NCM_assoc a b c)
-  end.
-  
-Ltac rm_evar ls :=
-  match ls with
-  | nil => nil 
-  | ?a :: ?ls' => let ls'' := rm_evar ls' in constr:(a :: ls'')
-  | ?a :: ?ls' => ls' (* I cannot believe this works. Jeez. *)
-  end.
-
-Ltac split_reify_wrt vs1 vs2 ls :=
-  match ls with
-  | nil => constr:((@nil nat, @nil nat))
-  (* in subset vs1 *)
-  | ?a :: ?ls' => let i := lookup a vs1 in
-                 let idx := split_reify_wrt vs1 vs2 ls' in
-                 match idx with 
-                 | (?l, ?r) => constr:((i :: l, r))
-                 end
-  (* not in subset vs1 *)
-  | ?a :: ?ls' => let i := lookup a vs2 in
-                 let idx := split_reify_wrt vs1 vs2 ls' in
-                 match idx with 
-                 | (?l, ?r) => constr:((l, i :: r))
-                 end
-  end.
-  
-
-Ltac simpl_args_evar :=
-  match goal with
-  [ |- [ ?e1 ] ∙ ?ev = [ ?e2 ] ] => 
-                          let H1 := fresh "H" in
-                          let H2 := fresh "H" in
-                          let x1 := fresh "x" in
-                          let x2 := fresh "x" in
-                          remember e1 as x1 eqn:H1; 
-                          remember e2 as x2 eqn:H2;
-                          simpl in H1, H2;
-                          rewrite <- H1, <- H2 in *; clear x1 x2 H1 H2
- end.
-
-Ltac prep_reification_evar := 
-  match goal with
-  | [ |- ?a1 ∙ ?ev = ?a2 ] => 
-    let A := type of a1 in
-    let e1 := reify A a1 in
-    let e2 := reify A a2 in
-    change (([e1] : A) ∙ ev = ([e2] : A));
-    repeat rewrite flatten_correct; auto;
-    simpl_args_evar  
-  end.
-
-Ltac reification_wrt_evar :=
-  let A := type_of_goal in
-  match goal with
-  | [ |- [Some ?ls1] ∙ ?ev = [Some ?ls2] ] =>
-    let sub := ls1 in
-    let super := append sub ls2 in 
-    let idx := split_reify_wrt sub super ls2 in
-    let ls2' := match idx with
-                | (?idx2, ?idx3) => constr:(index_wrt super (idx2 ++ idx3))
-                end in
-    apply (@Overture.concat A _ ([ls2'] : A));
-      [ | simpl; reification]
-  end.
 
 
-Lemma split_list : forall values ls1 ls2,
-  [index_wrt values (ls1 ++ ls2)] = [index_wrt values ls1] ∙ [index_wrt values ls2].
-Proof.
-  induction ls1; intros.
-  + simpl. rewrite NCM_unit_l. reflexivity.
-  + simpl in *. rewrite IHls1. rewrite NCM_assoc. reflexivity.
-Qed.  
 
-Lemma split_m : forall a1 a2 b1 b2, a1 = a2 -> b1 = b2 -> a1 ∙ b1 = a2 ∙ b2.
-Proof. 
-  intros a1 a2 b1 b2 Ha Hb.
-  rewrite Ha, Hb.
-  reflexivity.
-Defined.
-
-Ltac reification' := 
-  repos_evar;
-  prep_reification_evar;
-  reification_wrt_evar;
-  rewrite split_list;
-  apply split_m; [reification | reflexivity].
 
 
 Example NCM_evar : forall a b c, exists d, b = d -> a ∙ b ∙ c = c ∙ d ∙ a ∙ 1.   
@@ -777,7 +777,8 @@ Class PMonoid_Laws (A : Type) `{PMonoid A} :=
   { PMonoid_unit : forall a, m' a one' = Some a ;
     PMonoid_assoc : forall a b c, (do x ← m' b c; m' a x) = (do x ← m' a b; m' x c) ;
     PMonoid_comm : forall a b, m' a b = m' b a ;
-    PMonoid_nilpotence : forall a, base' a -> m' a a = None
+    PMonoid_nilpotence : forall a, base' a -> m' a a = None ;
+    PMonoid_base : forall a b, base' a -> base' b -> a <> b -> m' a b <> None
    }.
 
 Instance PMonoid_NCM {A} `{PMonoid A} : NCM (option A) :=
