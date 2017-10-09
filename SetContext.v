@@ -1,43 +1,93 @@
 Require Import HoTT.
 Require Import Monad.
+Require Import MerePermutation.
 Require Import Permutation.
 Require Import Monoid.
-Require Import TypingContext.
+(*Require Import TypingContext.*)
+Require Import List.
+
+Print transport.
+Definition transport_2 {A B} (P : A -> B -> Type) {x x' : A} {y y' : B} (p : x = x') (p' : y = y') (u : P x y) : P x' y'.
+Proof.
+  destruct p. destruct p'. exact u.
+Defined.
+Lemma transport_2_1_l : forall {A B} (P : A -> B -> Type) 
+                                {x : A } {y y' : B} (p : y = y') (u : P x y), 
+      transport_2 P 1%path p u = transport (P x) p u.
+Proof.
+  destruct p; auto.
+Defined.
+Lemma transport_2_1_r : forall {A B} (P : A -> B -> Type) 
+                               {x x' : A} {y : B} (p : x = x') (u : P x y), 
+      transport_2 P p 1%path u = transport (fun x => P x y) p u.
+Proof.
+  destruct p; auto.
+Defined.
+
+
+Section quotient_ind2.
+  About quotient_ind.
+  Variable A : Type.
+  Variable R : relation A.
+  Variable sR : is_mere_relation A R.
+  Variable P : quotient R -> quotient R -> Type.
+  Variable P_IsHProp : forall x y, IsHProp (P x y).
+  Variable dclass : forall x y : A, P (class_of R x) (class_of R y). 
+
+  Let P_HSet : forall q1 q2, IsHSet (P q1 q2). 
+  Proof. intros. apply trunc_succ. Qed.
+
+  Let dclass' : forall q y, P q (class_of R y).
+  Proof.
+    intros q y.
+    generalize dependent q.
+    apply quotient_ind with (dclass0 := fun x' => dclass x' y); auto.
+    intros.
+    apply P_IsHProp.
+  Defined.
+
+
+  Definition quotient_ind2 : forall x y, P x y.
+  Proof.
+    intros q.
+    apply quotient_ind with (dclass0 := dclass' q); auto.
+    intros x y H.
+    apply P_IsHProp.
+  Defined.
+
+End quotient_ind2.
+Arguments quotient_ind2 {A} {R} {sR}.
 
 Instance hset_option : forall B, IsHSet B -> IsHSet (option B).
 Admitted.
 
-Set Implicit Arguments.
+Ltac true_false_contradiction :=
+  match goal with
+  | [ H : true = false |- _ ] => exact (Empty_rec (true_ne_false H))
+  | [ H : false = true |- _ ] => exact (Empty_rec (false_ne_true H))
+  end.
+
 
 (* Consider the propositional truncation of Permutation *)
 Section MySet.
 
+Set Implicit Arguments.
 Open Scope list_scope.
 Variable A : Type.
+Variable decA : `{DecidablePaths A}.
 
-Definition TPermutation : list A -> list A -> Type :=
-  fun ls1 ls2 => Trunc -1 (Permutation ls1 ls2).
-
-Lemma tperm_skip : forall x ls1 ls2, TPermutation ls1 ls2 -> 
-                   TPermutation (x :: ls1) (x :: ls2).
-Proof. 
-  intros x ls1 ls2 p.
-  apply (Trunc_rec (fun p' => tr (perm_skip x p')) p).
-Defined.
-
-Definition set := quotient TPermutation.
+Definition set := quotient bPermutation.
 Definition from_list ls : set := class_of _ ls.
-
 
 
 Lemma from_list_eq : forall ls1 ls2, Permutation ls1 ls2 ->
                      from_list ls1 = from_list ls2.
 Proof.
   intros. 
-  apply related_classes_eq.
-  apply tr. 
+  apply related_classes_eq; auto.
+  apply Permutation_bPermutation.
   auto.
-Defined.
+Qed.
 
 
 Lemma IsHSet_implies_IsHProp : forall X, IsHSet X -> forall (x y : X), IsHProp (x = y).
@@ -67,6 +117,45 @@ Defined.
 (*** Recursion Schemes ***)
 (*************************)
 
+Section set_rect.
+  Variable P : set -> Type.
+  Variable P_HSet : forall (X : set), IsHSet (P X).
+
+  Variable dclass : forall (ls : list A), P (from_list ls).
+
+  Variable dclass_eq : forall (ls1 ls2 : list A) 
+                              (perm : bPermutation ls1 ls2),
+    transport P (related_classes_eq bPermutation perm) (dclass ls1) 
+    = dclass ls2.
+
+  Definition set_rect : forall (X : set), P X.
+  Proof. 
+    apply (quotient_ind bPermutation _ dclass dclass_eq). 
+  Defined.
+
+End set_rect.
+
+Section set_ind. 
+  Variable P : set -> Type.
+  Variable P_HProp : forall (X : set), IsHProp (P X).
+
+  Variable dclass : forall (ls : list A), P (from_list ls).
+  
+  Let dclass_eq : forall (ls1 ls2 : list A) 
+                         (perm : bPermutation ls1 ls2),
+    transport P (related_classes_eq bPermutation perm) (dclass ls1) 
+    = dclass ls2.
+  Proof.
+    intros; apply P_HProp.
+  Qed.
+  
+  Definition set_ind : forall X, P X.
+  Proof.
+    apply (set_rect _ _ dclass dclass_eq).
+  Defined.
+End set_ind.
+
+
 Section set_rec.
   Variable B : Type.
   Variable B_HSet : IsHSet B.
@@ -75,48 +164,14 @@ Section set_rec.
            dclass ls1 = dclass ls2.
   Definition set_rec : set -> B.
   Proof.
-    apply (quotient_rec TPermutation dclass).
-    unfold TPermutation. 
-    intros ls1 ls2 trunc.
-    exact (Trunc_rec (@dclass_eq ls1 ls2) trunc).
+    apply (set_rect _ _ dclass).
+    intros. 
+    rewrite transport_const.
+    apply dclass_eq; auto.
+    eapply bPermutation_Permutation; auto.
   Defined.
+
 End set_rec.
-
-
-Section set_ind.
-  Variable P : set -> Type.
-  Variable P_HProp : forall (X : set), IsHProp (P X).
-
-  Let P_HProp' : forall (X : set) (x y : P X), x = y.
-  Proof. apply P_HProp. Defined.
-
-  Let P_HSet : forall X : set, IsHSet (P X).
-  Proof. 
-    intros X. apply trunc_succ.
-  Defined.
-
-  Variable dclass : forall (ls : list A), P (from_list ls).
-
-  Local Lemma P_mere_relation : forall (X : set) (x y : P X), IsHProp (x = y).
-  Proof. intros. apply trunc_succ. Defined.
-
-
-  Local Lemma dclass_eq : forall (ls1 ls2 : list A) 
-                            (perm : Permutation ls1 ls2),
-    transport P (related_classes_eq TPermutation (tr perm)) (dclass ls1) 
-    = dclass ls2.
-  Proof.
-    intros. apply P_HProp'. 
-  Defined.
-
-  Definition set_ind : forall (X : set), P X.
-  Proof. 
-    apply (quotient_ind TPermutation _ dclass).
-    intros ls1 ls2. 
-    apply Trunc_ind; intros; [apply P_mere_relation | apply dclass_eq ]. 
-  Defined.
-
-End set_ind.
 
 
 Section set_rec2.
@@ -143,6 +198,7 @@ Section set_rec2.
     apply set_rec with (dclass := fun ls1 => dclass' ls1 Y); auto.
   Defined.
 End set_rec2.
+
 
 Section set_ind2.
   Variable P : set -> set -> Type.
@@ -244,11 +300,15 @@ Hint Resolve hset_bool.
 Hint Resolve bool_HProp.
 Hint Resolve hprop_set.
 Hint Resolve hprop_option_set.
+Arguments set A {decA}.
 
 
 Section set_list_functor.
   Variable A : Type.
+  Variable decA : `{DecidablePaths A}.
   Variable B : Type.
+  Variable decB : `{DecidablePaths B}.
+
 
   About quotient_functor.
   Variable f : list A -> list B.
@@ -257,23 +317,24 @@ Section set_list_functor.
   Definition set_list_functor : set A -> set B.
   Proof.
     apply (quotient_functor _ _ f).
-    intros ls1 ls2.
-    unfold TPermutation.
-    apply (Trunc_functor _ (@f_correct ls1 ls2)).
+    intros x y perm.
+    apply Permutation_bPermutation.
+    apply f_correct.
+    apply bPermutation_Permutation.
+    auto.
   Defined.
 End set_list_functor.
 
 Section defns.
   Variable A : Type.
-
-Section add.
+  Variable decA : `{DecidablePaths A}.
 
 Definition add (x : A) : set A -> set A.
 Proof.
-  apply (set_list_functor (cons x)).
+  apply (set_list_functor _ (cons x)).
   intros. apply perm_skip; auto.
 Defined.
-End add.
+
 
 
 Fixpoint append ls1 ls2 : list A :=
@@ -289,15 +350,14 @@ Admitted.
   
 Definition merge : set A -> set A -> set A.
 Proof.
-  apply set_rec2 with (dclass := fun ls1 ls2 => from_list (append ls1 ls2)); 
+  apply set_rec2 with (dclass := fun ls1 ls2 => from_list _ (append ls1 ls2)); 
     auto.
   intros. 
   apply from_list_eq.
   apply append_correct; auto.
 Defined.
 
-
-Arguments empty {A}.
+Arguments empty {A} {decA}.
 Notation "∅" := empty.
 Notation "X ∪ Y" := (merge X Y) (at level 40).
 
@@ -325,32 +385,33 @@ Proof.
   simpl. rewrite append_nil_r; auto.
 Defined.
 
-Lemma append_cons : forall ls1 ls2 a, 
+Lemma perm_append_cons : forall ls1 ls2 a, 
     Permutation (append ls1 (a :: ls2)) (a :: (append ls1 ls2)).
 Proof.
   induction ls1 as [ | b ls1]; intros; auto.
-  simpl.
+  simpl. 
   apply perm_trans with (l' := b :: a :: append ls1 ls2); auto.
-  apply perm_swap.
-Defined.
+    apply perm_swap.
+Qed.
 
 
-Lemma append_comm : forall ls1 ls2,
+Lemma perm_append_comm : forall ls1 ls2,
       Permutation (append ls1 ls2) (append ls2 ls1).
 Proof.
   induction ls1 as [ | a ls1]; intros ls2; simpl.
-  - rewrite append_nil_r; auto.
-  - eapply perm_trans; [ | apply Permutation_sym; apply append_cons].
-    auto.
-Defined.
+  - rewrite append_nil_r; auto. 
+  - eapply perm_trans with (l' := a :: append ls2 ls1); auto. 
+    apply Permutation_sym; auto.
+    apply perm_append_cons.
+Qed.
 
 Lemma merge_comm : forall a b, a ∪ b = b ∪ a.
 Proof.
   apply set_ind2; auto.
   intros; simpl.
   apply from_list_eq.
-  apply append_comm.
-Defined.
+  apply perm_append_comm.
+Qed.
 
 Lemma append_assoc : forall ls1 ls2 ls3, 
     append (append ls1 ls2) ls3 = append ls1 (append ls2 ls3).
@@ -368,20 +429,22 @@ End merge.
 
 
 Arguments empty {A}.
+About singleton_set.
+Arguments singleton_set {A} {decA}.
 
 Section set_functor.
   Variable B : Type.
+  Variable decB : `{DecidablePaths B}.
   Variable (f : A -> B).
 
   Let f' : list A -> list B := fmap f.
 
   Let f'_correct : forall ls1 ls2, Permutation ls1 ls2 -> Permutation (f' ls1) (f' ls2).
   Proof.
-    intros ls1 ls2 perm. unfold f'.
-    induction perm; simpl; auto.
-    - apply perm_swap; auto.
+    induction 1; unfold f'; simpl; auto.
+    - apply perm_swap.
     - eapply perm_trans; eauto.
-  Defined.
+  Qed.
 
   Definition set_fmap : set A -> set B.
   Proof.
@@ -394,57 +457,21 @@ End set_functor.
    about e.g. typing contexts, we only care about equality up to 
    the first argument e.g. we want x:Bool ∪ x:Nat to fail
 *)
-  Context (R : relation A) `{relR : is_mere_relation A R}
-          `{reflexiveR : Reflexive _ R} 
-          `{transitiveR : Transitive _ R} 
-          `{symmetricR : Symmetric _ R}
-          `{decR : forall x y, Decidable (R x y)}.
-
-Definition b_decR a b : Bool :=
-  if decR a b then true else false.
-Notation "a R? b" := (b_decR a b) (at level 40).
-
-
-Lemma R_HProp : forall a b, IsHProp (R a b).
-Proof. auto. Defined.
-Hint Resolve R_HProp.
-
-Lemma decR_true : forall a b (pf : R a b), a R? b = true.
-Proof.
-  intros.
-  unfold b_decR.
-  destruct (decR a b) as [pf' | ]; auto.
-  contradiction.
-Defined.
-
-Lemma decR_false : forall a b (pf : ~ R a b), a R? b = false.
-Proof.
-  intros.
-  unfold b_decR.
-  destruct (decR a b) as [pf' | pf']; auto. 
-  contradiction.
-Defined.
-
 
 Section in_set.
-Fixpoint in_list (x : A) (ls : list A) : Bool :=
-  match ls with
-  | nil => false
-  | y::ls' => (x R? y) || (in_list x ls')
-  end.
 
 Lemma in_set_correct : forall ls1 ls2, Permutation ls1 ls2 ->
-    forall x, in_list x ls1 = in_list x ls2.
+    forall x, bin x ls1 = bin x ls2.
 Proof.
   intros ls1 ls2 p; induction p; intros; auto.
-  - simpl. destruct (b_decR x0 x); simpl; auto.
-  - simpl. destruct (b_decR x0 y); destruct (b_decR x0 x); auto.
+  - simpl. destruct (b_dec x0 x); simpl; auto.
+  - simpl. destruct (b_dec x0 y); destruct (b_dec x0 x); auto.
   - rewrite IHp1, IHp2. reflexivity.
 Defined.
 
 Definition in_set (x : A) : set A -> Bool.
 Proof.
-  apply (set_rec _ (in_list x)).
+  apply (set_rec _ (bin x)).
   intros; apply in_set_correct; auto.
 Defined.
 
@@ -453,12 +480,15 @@ End in_set.
 Notation " x ∈? X " := (in_set x X) (at level 80).
 Notation " x ∈ X " := (x ∈? X = true) (at level 80).
 
+Definition disjoint_add (x : A) (X : set A) : option (set A) :=
+  if x ∈? X then None else Some (add x X).
+
 Section disjoint.
 
 Fixpoint disjoint_list (ls1 ls2 : list A) : Bool :=
   match ls1 with
   | nil => true
-  | a :: ls1' => negb (in_list a ls2) && disjoint_list ls1' ls2
+  | a :: ls1' => negb (bin a ls2) && disjoint_list ls1' ls2
   end.
 
 
@@ -483,11 +513,61 @@ Notation "X ⊥⊥ Y" := (disjoint X Y) (right associativity, at level 46).
 
 Open Scope bool_scope.
 
-Lemma disjoint_nilpotent : forall a, a <> empty -> a ⊥⊥ a = false.
-Admitted.
+Arguments from_list {A} {decA}.
 
+Definition list_is_empty (ls : list A) : Bool :=
+  match ls with
+  | nil => true
+  | _   => false
+  end.
+  
+Definition is_empty : set A -> Bool.
+Proof.
+  apply set_rec with (dclass := list_is_empty); auto.
+  induction 1; auto.
+  exact (IHX1 @ IHX2).
+Defined.
+
+Lemma disjoint_nilpotent : forall a, a ⊥⊥ a = is_empty a.
+Proof. 
+  apply set_ind; auto.
+  induction ls; simpl; auto. 
+  rewrite b_dec_true; auto.
+Qed.
+
+Lemma b_dec_sym : forall a b, (a =? b) = (b =? a).
+Proof.
+  intros.
+  destruct (decA a b).
+  - rewrite b_dec_true; auto.
+    rewrite b_dec_true; auto; exact p^.
+  - rewrite b_dec_false; auto.
+    destruct (decA b a); auto.
+    * set (p' := p^). contradiction.
+    * rewrite b_dec_false; auto.
+Qed.
+
+
+Lemma disjoint_list_cons_r : forall ls1 ls2 b,
+      disjoint_list ls1 (b :: ls2) = negb (bin b ls1) && disjoint_list ls1 ls2.
+Proof.
+  induction ls1; intros; auto.
+  simpl. rewrite IHls1; auto.
+  rewrite b_dec_sym.
+  destruct (b =? a), (bin a ls2), (bin b ls1); simpl; auto.
+Qed.
+
+    
 Lemma disjoint_comm : forall a b, a ⊥⊥ b = b ⊥⊥ a.
-Admitted.
+Proof.
+  apply set_ind2; auto.
+  induction ls1 as [ | a1 ls1]; destruct ls2 as [ | a2 ls2]; simpl in *; auto.
+  - exact (disjoint_list_nil_r _)^.
+  - exact (disjoint_list_nil_r _).
+  - rewrite IHls1. rewrite disjoint_list_cons_r. simpl.
+    rewrite b_dec_sym.
+    destruct (a2 =? a1), (bin a1 ls2), (bin a2 ls1); simpl; auto.
+Qed.
 
 
 Lemma disjoint_merge_r : forall a b c, a ⊥⊥ (merge b c) = (a ⊥⊥ b) && (a ⊥⊥ c).
@@ -497,8 +577,8 @@ Lemma disjoint_merge_l : forall a b c, (merge a b) ⊥⊥ c = (a ⊥⊥ c) && (b
 Admitted.
 
 Lemma singleton_disjoint : forall a b, 
-      singleton_set a ⊥⊥ singleton_set b = negb (a R? b).
-Proof. intros. simpl. destruct (a R? b); auto. Qed.
+      singleton_set a ⊥⊥ singleton_set b = negb (a =? b).
+Proof. intros. simpl. destruct (a =? b); auto. Qed.
 
 
 Lemma merge_append : forall ls1 ls2, 
@@ -510,61 +590,39 @@ Qed.
 
 (* PROPERTIES *)
 
-Lemma disjoint_empty : forall X, X ⊥⊥ empty = true.
+Lemma disjoint_empty : forall X, X ⊥⊥ ∅ = true.
 Proof.
   apply set_ind; auto.
   induction ls; auto.
 Defined.
 
-Lemma in_list_R : forall a b ls, R a b -> in_list a ls = in_list b ls.
-Proof.
-  intros a b ls pf_R. induction ls; auto.
-  simpl.
-  destruct (decR a a0) as [R_a_a0 | R_a_a0].
-  * assert (R_b_a0 : R b a0) by exact (transitiveR (symmetricR pf_R) R_a_a0).
-    repeat rewrite decR_true; simpl; auto.
-  * assert (R_b_a0 : ~ R b a0).
-    { intros R_b_a0. apply R_a_a0.
-      exact (transitiveR pf_R R_b_a0). }
-    repeat rewrite decR_false; simpl; auto.
-Defined.
-
 Definition add_in_property a b X := (a ∈? X) = (b ∈? X).
 
-Lemma add_R : forall a b X, R a b -> add_in_property a b X.
-Proof.
-  intros a b X pf_R. generalize dependent X. 
-  set (dclass := ((fun ls => in_list_R ls pf_R) 
-              : forall ls, add_in_property a b (from_list ls))).
-  simpl in dclass.
-  apply (set_ind _ _ dclass).
-Defined.
-
-Lemma add_in : forall a b X, R a b -> (a ∈? add b X) = true.
+Lemma add_in : forall a X, (a ∈? add a X) = true.
   Proof.
-  intros a b X pf_R. generalize dependent X.
-  apply (set_ind); intros; auto.
-  simpl.
-  rewrite decR_true; auto.
+  intros a.
+  apply set_ind; auto.
+  intros; simpl.
+  rewrite b_dec_true; auto.
 Defined.
 
-Lemma add_not_in : forall a b, ~ R a b -> forall X, (a ∈? add b X) = (a ∈? X).
+Lemma add_not_in : forall a b, a <> b -> forall X, (a ∈? add b X) = (a ∈? X).
 Proof.
-  intros a b pf_R.
+  intros a b neq.
   apply set_ind; intros; auto.
   simpl.
-  rewrite decR_false; auto.
+  rewrite b_dec_false; auto.
 Defined.
 
 Lemma add_symmetric : forall a b,
-      ~ R a b -> forall X, add a (add b X) = add b (add a X).
+      a <> b -> forall X, add a (add b X) = add b (add a X).
 Proof.
   intros a b pf_R.
   apply set_ind; intros; auto.
   simpl. 
-    apply related_classes_eq.
-    apply tr.
-    apply perm_swap.
+  apply related_classes_eq.
+  apply Permutation_bPermutation.
+  apply perm_swap.
 Defined.
 
 
@@ -583,18 +641,63 @@ Notation "X ∪ Y" := (merge X Y) (at level 40).
 Section SetContext.
 
 Variable A : Type.
-Definition PreCtx X := set (X * A).
-
-Definition shift {X} : PreCtx X -> PreCtx (option X) :=
-  set_fmap (fun (z : X * A) => let (x,a) := z in (Some x, a)).
-
 Variable X : Type.
 Context `{decX : DecidablePaths X}.
-
+Context `{Funext}.
 Definition R (z1 z2 : X * A) : Type :=
   (fst z1) = (fst z2).
+Definition dom := quotient R.
+
+Instance decR : DecidablePaths dom.
+Proof.
+  unfold DecidablePaths. unfold dom.
+  intros q.
+  set (P := fun y => Decidable (q = y)). About quotient_ind.
+  transparent assert (dclass : (forall z, P (class_of _ z))).
+  { intros [x a].
+    unfold P. clear P. 
+    generalize dependent q.
+    set (Q := fun q => Decidable (q = class_of R (x, a))).
+    transparent assert (dclass' : (forall z, Q (class_of _ z))).
+    { unfold Q; clear Q.
+      intros [y b].
+      destruct (decX x y).
+      * left.
+        apply related_classes_eq.
+        unfold R.
+        simpl.
+        exact p^.
+      * right.
+        intros contr. 
+        admit (* :( *).
+    }
+    apply quotient_ind with (dclass := dclass'); unfold Q; auto.
+    - intros. apply hset_sum.
+    - intros [y b] [z c] HR.
+      unfold R in HR. simpl in HR.
+      unfold dclass'. simpl.
+      destruct (decX x y); auto.
+      * set (p' := p @ HR).
+        destruct (decX x z); [ | contradiction].
+        admit.
+      * admit.
+  }
+  apply quotient_ind with (dclass0 := dclass); auto.
+  - unfold P. intros. apply hset_sum.
+  - intros [x a] [y b] HR.
+    admit.
+Admitted.
+  
+
+Definition PreCtx := set dom.
+
+(*
+Definition shift {X} : PreCtx X -> PreCtx (option X) :=
+  set_fmap (fun (z : X * A) => let (x,a) := z in (Some x, a)).
+*)
 
 Notation "X ⊥⊥ Y" := (@disjoint _ R _ _ _ _ _ X Y) (right associativity, at level 46).
+
 
 Hint Unfold R.
 Instance decR : forall (z1 z2 : X * A), 
@@ -624,16 +727,11 @@ About merge.
 
 Definition disjoint_merge : PreCtx X -> PreCtx X -> option (PreCtx X).
 Proof.
-  intros Γ1 Γ2. About disjoint.
+  intros Γ1 Γ2.
   set (b := @disjoint _ R _ _ _ _ _ Γ1 Γ2).
   exact (if b then Some (Γ1 ∪ Γ2) else None).
 Defined.
 
-Ltac true_false_contradiction :=
-  match goal with
-  | [ H : true = false |- _ ] => exact (Empty_rec (true_ne_false H))
-  | [ H : false = true |- _ ] => exact (Empty_rec (false_ne_true H))
-  end.
 
 
 Open Scope bool_scope.
@@ -785,6 +883,7 @@ Qed.
 
 End SetContext.    
 
+About disjoint_merge.
     
 
 (* So option(PreCtx X) is an NCM *)
@@ -851,7 +950,7 @@ Section Ctx_rec.
   Variable B_HSet : IsHSet B.
   Variable dclass_None : B.
   Variable dclass_Some : list (X * A) -> B.
-  Variable dclass_Some_correct : forall ls1 ls2, Permutation ls1 ls2 ->
+  Variable dclass_Some_correct : forall ls1 ls2, Perm _ ls1 ls2 ->
            dclass_Some ls1 = dclass_Some ls2.
 
   Definition Ctx_rec : Ctx X A -> B.
@@ -885,18 +984,55 @@ Proof.
   induction ls; auto.
 Defined.
 
-Lemma from_list_cons : forall Y `{DecidablePaths Y} (y : Y) (a : A) (ls : list (Y * A)),
-                  Some (from_list ((y,a) :: ls)) = disjoint_merge (singleton_set (y,a)) (from_list ls).
-Admitted.
+Lemma from_list_cons : forall {Z} `{DecidablePaths Z} (z : Z) (a : A) ls,
+      from_list ((z,a) :: ls) = singleton_set (z,a) ∪ from_list ls.
+Proof. auto. Qed.
 
-Lemma fmap_singleton_merge : forall (x : X) a (Γ : Ctx X A),
-                       fmap f (singleton x a ∙ Γ) = singleton (f x) a ∙ fmap f Γ.
+(*
+Lemma from_list_cons : forall {Z} `{DecidablePaths Z} (z : Z) (a : A) ls,
+      bin (@R A Z) (z,a) ls = false ->
+      Some (from_list ((z,a) :: ls)) = singleton z a ∙ Some (from_list ls).
 Proof.
-  intros.
-  simpl.
-  destruct Γ; auto. simpl. unfold singleton_set. unfold disjoint_merge.
-  set (b := from_list ((x,a) :: nil) ⊥⊥ p).
-Admitted.
+  intros. simpl. unfold disjoint_merge. simpl.
+  rewrite andb_true_r.
+  rewrite X0. auto.
+Defined.
+
+Lemma from_list_cons_undefined : forall {Z} `{DecidablePaths Z} (z : Z) (a : A) ls,
+      bin (@R A Z) (z,a) ls = true ->
+      from_list ((z,a) :: ls) = singleton_set z a ∪ from_list ls.
+*)
+
+Open Scope bool_scope.
+
+Lemma fmap_cons : forall x a ls, fmap f' ((x,a) :: ls) = (f x, a) :: fmap f' ls.
+Proof. intros; simpl; unfold f'; auto. Qed.
+
+Lemma disjoint_merge_cons : forall {Z} `{DecidablePaths Z} (z : Z) (a : A) ls1 ls2,
+      disjoint_merge (from_list ((z,a) :: ls1)) (from_list ls2)
+    = singleton z a ∙ disjoint_merge (from_list ls1) (from_list ls2).
+Proof.
+  intros. simpl. unfold disjoint_merge.
+  assert (eq : from_list ((z,a) :: ls1) ⊥⊥ from_list ls2 
+        = negb (bin (@R A Z) (z,a) ls2) && (from_list ls1 ⊥⊥ from_list ls2))
+    by auto.
+  rewrite eq.
+  remember (from_list ls1 ⊥⊥ from_list ls2) as b eqn:Hb.
+  rewrite Hb.
+  destruct b.
+  * rewrite andb_true_r.
+  *
+
+
+
+
+
+Instance PCM_set_laws Z `{DecidablePaths Z} : PCM_Laws (option (PreCtx A Z)).
+Proof.
+  apply PPCM_to_PCM_Laws.
+  apply PPCM_set_laws.
+Defined.
+Hint Resolve PCM_set_laws.
 
 Lemma fmap_merge : forall (Γ1 Γ2 : Ctx X A),
                    fmap f (Γ1 ∙ Γ2) = fmap f Γ1 ∙ fmap f Γ2.
@@ -907,17 +1043,26 @@ Proof.
     repeat rewrite fmap_from_list. 
     generalize dependent ls2.
     induction ls1 as [ | [x1 a1] ls1]; intros ls2; try (simpl; auto; fail).
-    erewrite from_list_cons. 
-    assert (eq : disjoint_merge (singleton_set (x1,a1)) (from_list ls1) 
-               = singleton x1 a1 ∙ Some (from_list ls1)) by auto.
-    rewrite eq.
+    remember (bin (@R A X) (x1,a1) ls1) as b1 eqn:Hb1.
+    remember (bin (@R A X) (x1,a1) ls2) as b2 eqn:Hb2.
+    simpl.
+
+    destruct b1, b2. 
+    (* in the first three cases, if x1 occurs in either ls1 or ls2, then    
+       both sides should be undefined *)
+    * 
+    *
+    *
+    *
+
+    rewrite from_list_cons.
+    rewrite M_comm_assoc; [ | apply (@PPCM_to_PCM_Laws _ _ (@PPCM_set_laws A X _))].
     rewrite <- M_assoc.
-    rewrite fmap_singleton_merge.
-    rewrite IHls1. 
-    rewrite M_assoc. f_ap.
-    simpl. unfold f' at 2. simpl.
-    erewrite from_list_cons.
-    reflexivity.
+    rewrite <- from_list_cons.
+    rewrite IHls1.
+    repeat rewrite fmap_cons.
+    repeat rewrite from_list_cons.
+    monoid.
 Admitted.
 
 Lemma fmap_singleton : forall (x : X) (a : A),

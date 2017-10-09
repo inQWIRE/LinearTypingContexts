@@ -108,6 +108,7 @@ VFILES:=Monad.v\
   Multiset.v\
   Permutation.v\
   PermutationReflection.v\
+  MerePermutation.v\
   Monoid.v\
   TypingContext.v\
   NCM.v\
