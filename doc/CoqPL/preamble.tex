@@ -1,0 +1,304 @@
+%\usepackage{bigfoot} % helps listings go in footnotes
+\usepackage{xcolor}
+\hypersetup{
+    colorlinks,
+    linkcolor={red!50!black},
+    citecolor={blue!50!black},
+    urlcolor={blue!80!black}
+}
+\usepackage[capitalize,noabbrev]{cleveref} % must be loaded after hyperref
+
+\usepackage[utf8]{inputenc}
+%\usepackage[T1]{fontenc}
+%\newcommand{\upsidedownbang}{!`}
+\newcommand{\upsidedownbang}{\rotatebox[origin=c]{180}{!}}
+%\usepackage{anyfontsize}
+\usepackage{xspace}
+
+%\usepackage{mathastext}
+%\MTfamily{\ttdefault}\Mathastext % reload, but use \ttdefault
+
+
+\usepackage{amsmath,amsfonts,amsthm}
+
+% Figures
+\usepackage{wrapfig}
+
+% Lists
+\usepackage[inline,shortlabels]{enumitem}
+
+% Proof trees
+\usepackage{mathpartir}
+
+% Symbolx
+\usepackage{cmll} % Linear logic symbols
+\usepackage{ stmaryrd } % more math symbols
+\usepackage{upquote} % straight quote
+
+% Bibliography
+%\usepackage[numbers]{natbib}
+%\usepackage{url}
+%\usepackage[strings]{underscore}
+
+
+% Quantum
+\usepackage[qm,braket]{qcircuit}
+%\usepackage{braket}
+\newcommand{\qwire}{\ensuremath{\mathcal{Q}\textsc{wire}}\xspace}
+\newcommand{\liquid}{LIQ\emph{Ui}$\ket{}$}
+
+%   Tikz
+\usepackage{tikz} %commutativity diagrams
+\usetikzlibrary{%
+  arrows,%
+  shapes.misc,% wg. rounded rectangle
+  shapes.arrows,%
+  shapes.callouts,
+  chains,%
+  matrix,%
+  positioning,% wg. " of "
+  scopes,%
+  decorations.pathmorphing,% /pgf/decoration/random steps | erste Graphik
+  decorations.text,
+  shadows%
+}
+\tikzset{ machine/.style={
+    % The shape:
+    rectangle,
+    % The size:
+    minimum width=20mm,
+    minimum height=10mm,
+    text width=16mm,
+    % The alignment
+    align=center,
+    % The border:
+    very thick,
+    draw=black,
+    % The colors:
+    color=black,
+    fill=white,
+    % Font
+    font=\ttfamily,
+  }
+}
+
+\newcommand{\function}[2]{#1~#2}
+\newcommand*\rfrac[2]{{}^{#1}\!/_{#2}}
+
+
+% Latin  Abbr
+\newcommand{\etal}{\emph{et al.}\xspace}
+\newcommand{\eg}{\emph{e.g.,}\xspace}
+\newcommand{\ie}{\emph{i.e.,}\xspace}
+\newcommand{\etc}{\emph{etc.}\xspace}
+
+
+% Functions
+\newcommand{\lbind}{\ensuremath{\mathbin{=\!\!>\!\!>\!\!=}}}
+\newcommand{\fun}{$\lambda$}
+\renewcommand{\put}[1]{\function{\code{put}}{#1}}
+\newcommand{\letbang}[3]{\code{let!}~#1=#2~\code{in}~#3}
+\newcommand{\suspend}[1]{\function{\code{suspend}}{#1}}
+\newcommand{\force}[1]{\function{\code{force}}{#1}}
+\newcommand{\open}[1]{\function{\code{open}}{#1}}
+\newcommand{\close}[1]{\function{\code{close}}{#1}}
+
+\newcommand{\denote}[1]{\ensuremath{\llbracket#1\rrbracket}}
+
+
+
+% Table formatting
+\newcommand{\ltwo}[1]{\multicolumn{2}{l}{#1}}
+\newcommand{\ctwo}[1]{\multicolumn{2}{c}{#1}}
+\usepackage{booktabs}
+
+% Types
+\newcommand{\One}{\code{One}}
+\newcommand{\Bit}{\code{Bit}}
+\newcommand{\Qubit}{\code{Qubit}}
+% Qwire Syntax
+\newcommand{\Gate}[2]{\code{Gate}(#1,#2)}
+\newcommand{\Unitary}[2]{\code{Unitary}(#1,#2)}
+\renewcommand{\Box}[2]{\code{Box}(#1,#2)}
+\newcommand{\mkbox}[2]{\code{box}(#1 \Rightarrow #2)}
+\newcommand{\qcontrol}[1]{\code{control}~#1}  % \control conflicts with qcircuit package
+\newcommand{\bitcontrol}[1]{\code{bit-control}~#1}
+
+% Code
+\newcommand{\None}{\code{None}}
+\newcommand{\Some}[1]{\code{Some}~#1}
+
+
+% Listings
+\usepackage{listings,lstcoq}
+%\usepackage{MnSymbol}
+\definecolor{ltblue}{rgb}{0,0.4,0.4}
+\definecolor{dkblue}{rgb}{0,0.1,0.6}
+\definecolor{dkgreen}{rgb}{0,0.35,0}
+\definecolor{dkviolet}{rgb}{0.3,0,0.5}
+\definecolor{dkred}{rgb}{0.5,0,0}
+\lstset{language=Coq}
+
+\newcommand{\code}[1]{{\small\texttt{#1}}}
+%\newcommand{\code}[1]{\lstinline{#1}}
+
+
+\newenvironment{nscenter}
+ {\parskip=3pt\par\nopagebreak\centering}
+ {\par\noindent\ignorespacesafterend}
+
+%% Unicode
+\usepackage{newunicodechar}
+\let\Alpha=A
+\let\Beta=B
+\let\Epsilon=E
+\let\Zeta=Z
+\let\Eta=H
+\let\Iota=I
+\let\Kappa=K
+\let\Mu=M
+\let\Nu=N
+\let\Omicron=O
+\let\omicron=o
+\let\Rho=P
+\let\Tau=T
+\let\Chi=X
+
+\newunicodechar{Α}{\ensuremath{\Alpha}}
+\newunicodechar{α}{\ensuremath{\alpha}}
+\newunicodechar{Β}{\ensuremath{\Beta}}
+\newunicodechar{β}{\ensuremath{\beta}}
+\newunicodechar{Γ}{\ensuremath{\Gamma}}
+\newunicodechar{γ}{\ensuremath{\gamma}}
+\newunicodechar{Δ}{\ensuremath{\Delta}}
+\newunicodechar{δ}{\ensuremath{\delta}}
+\newunicodechar{Ε}{\ensuremath{\Epsilon}}
+\newunicodechar{ε}{\ensuremath{\epsilon}}
+\newunicodechar{ϵ}{\ensuremath{\varepsilon}}
+\newunicodechar{Ζ}{\ensuremath{\Zeta}}
+\newunicodechar{ζ}{\ensuremath{\zeta}}
+\newunicodechar{Η}{\ensuremath{\Eta}}
+\newunicodechar{η}{\ensuremath{\eta}}
+\newunicodechar{Θ}{\ensuremath{\Theta}}
+\newunicodechar{θ}{\ensuremath{\theta}}
+\newunicodechar{ϑ}{\ensuremath{\vartheta}}
+\newunicodechar{Ι}{\ensuremath{\Iota}}
+\newunicodechar{ι}{\ensuremath{\iota}}
+\newunicodechar{Κ}{\ensuremath{\Kappa}}
+\newunicodechar{κ}{\ensuremath{\kappa}}
+\newunicodechar{Λ}{\ensuremath{\Lambda}}
+\newunicodechar{λ}{\ensuremath{\lambda}}
+\newunicodechar{Μ}{\ensuremath{\Mu}}
+\newunicodechar{μ}{\ensuremath{\mu}}
+\newunicodechar{Ν}{\ensuremath{\Nu}}
+\newunicodechar{ν}{\ensuremath{\nu}}
+\newunicodechar{Ξ}{\ensuremath{\Xi}}
+\newunicodechar{ξ}{\ensuremath{\xi}}
+\newunicodechar{Ο}{\ensuremath{\Omicron}}
+\newunicodechar{ο}{\ensuremath{\omicron}}
+\newunicodechar{Π}{\ensuremath{\Pi}}
+\newunicodechar{π}{\ensuremath{\pi}}
+\newunicodechar{ϖ}{\ensuremath{\varpi}}
+\newunicodechar{Ρ}{\ensuremath{\Rho}}
+\newunicodechar{ρ}{\ensuremath{\rho}}
+\newunicodechar{ϱ}{\ensuremath{\varrho}}
+\newunicodechar{Σ}{\ensuremath{\Sigma}}
+\newunicodechar{σ}{\ensuremath{\sigma}}
+\newunicodechar{ς}{\ensuremath{\varsigma}}
+\newunicodechar{Τ}{\ensuremath{\Tau}}
+\newunicodechar{τ}{\ensuremath{\tau}}
+\newunicodechar{Υ}{\ensuremath{\Upsilon}}
+\newunicodechar{υ}{\ensuremath{\upsilon}}
+\newunicodechar{Φ}{\ensuremath{\Phi}}
+\newunicodechar{φ}{\ensuremath{\phi}}
+\newunicodechar{ϕ}{\ensuremath{\varphi}}
+\newunicodechar{Χ}{\ensuremath{\Chi}}
+\newunicodechar{χ}{\ensuremath{\chi}}
+\newunicodechar{Ψ}{\ensuremath{\Psi}}
+\newunicodechar{ψ}{\ensuremath{\psi}}
+\newunicodechar{Ω}{\ensuremath{\Omega}}
+\newunicodechar{ω}{\ensuremath{\omega}}
+
+\newunicodechar{ℂ}{\ensuremath{\mathbb{C}}}
+\newunicodechar{ℕ}{\ensuremath{\mathbb{N}}}
+\newunicodechar{∅}{\ensuremath{\emptyset}}
+
+\newunicodechar{•}{\ensuremath{\bullet}}
+\newunicodechar{≈}{\ensuremath{\approx}}
+\newunicodechar{≅}{\ensuremath{\cong}}
+\newunicodechar{≡}{\ensuremath{\equiv}}
+\newunicodechar{≤}{\ensuremath{\le}}
+\newunicodechar{≥}{\ensuremath{\ge}}
+\newunicodechar{≠}{\ensuremath{\neq}}
+\newunicodechar{∀}{\ensuremath{\forall}}
+\newunicodechar{∃}{\ensuremath{\exists}}
+\newunicodechar{±}{\ensuremath{\pm}}
+\newunicodechar{∓}{\ensuremath{\pm}}
+\newunicodechar{·}{\ensuremath{\cdot}}
+\newunicodechar{⋯}{\ensuremath{\cdots}}
+\newunicodechar{…}{\ensuremath{\ldots}}
+\newunicodechar{∷}{~\mathrel{:\!\!\!:}~}
+\newunicodechar{×}{\ensuremath{\times}}
+\newunicodechar{∞}{\ensuremath{\infty}}
+\newunicodechar{→}{\ensuremath{\to}}
+\newunicodechar{←}{\ensuremath{\leftarrow}}
+\newunicodechar{⇒}{\ensuremath{\Rightarrow}}
+\newunicodechar{↦}{\ensuremath{\mapsto}}
+\newunicodechar{↝}{\ensuremath{\leadsto}}
+\newunicodechar{∨}{\ensuremath{\vee}}
+\newunicodechar{∧}{\ensuremath{\wedge}}
+\newunicodechar{⊢}{\ensuremath{\vdash}}
+\newunicodechar{⊣}{\ensuremath{\dashv}}
+\newunicodechar{∣}{\ensuremath{\mid}}
+\newunicodechar{∈}{\ensuremath{\in}}
+\newunicodechar{⊆}{\ensuremath{\subseteq}}
+\newunicodechar{⋓}{\ensuremath{\Cup}}
+\newunicodechar{∩}{\ensuremath{\cap}}
+\newunicodechar{∪}{\ensuremath{\cup}}
+\newunicodechar{∉}{\ensuremath{\not\in}}
+
+\newunicodechar{⊸}{\ensuremath{\multimap}}
+\newunicodechar{⊗}{\ensuremath{\otimes}}
+\newunicodechar{⊕}{\ensuremath{\oplus}}
+\newunicodechar{〈}{\ensuremath{\langle}}
+\newunicodechar{⟨}{\ensuremath{\langle}}
+\newunicodechar{⟩}{\ensuremath{\rangle}}
+\newunicodechar{〉}{\ensuremath{\rangle}}
+\newunicodechar{¡}{\ensuremath{\upsidedownbang}}
+\newunicodechar{∘}{\ensuremath{\circ}}
+\newunicodechar{†}{\ensuremath{\dagger}}
+\newunicodechar{⊤}{\ensuremath{\top}}
+
+\newunicodechar{〚}{\ensuremath{\llbracket}}
+\newunicodechar{〛}{\ensuremath{\rrbracket}}
+
+
+%% COMMENTS 
+\usepackage{etoolbox} % replaces ifthen package
+\newtoggle{comments}
+\toggletrue{comments}
+%\togglefalse{comments}
+
+\iftoggle{comments}{
+  \newcommand{\jennifer}[1]{\textbf{\textcolor{red}{[ #1 --- Jennifer]}}}
+  \newcommand{\steve}[1]{\textbf{\textcolor{green}{[ #1 --- Steve]}}}
+  \newcommand{\robert}[1]{\textbf{\textcolor{blue}{[ #1 --- Robert]}}}
+
+  \newcommand{\fixme}[1]{\textbf{\textcolor{red}{[ Fixme: #1]}}}
+  \newcommand{\note}[1]{\textbf{\textcolor{green}{[ Note: #1 ]}}}
+  \newcommand{\todo}[1]{\textbf{\textcolor{green}{[ TODO: #1 ]}}}
+}{
+  \newcommand{\jennifer}[1]{}
+  \newcommand{\steve}[1]{}
+  \newcommand{\robert}[1]{}
+
+  \newcommand{\fixme}[1]{}
+  \newcommand{\note}[1]{}
+  \newcommand{\todo}[1]{}
+}
+%% END COMMENTS
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

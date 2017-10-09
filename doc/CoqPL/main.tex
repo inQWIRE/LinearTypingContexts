@@ -1,0 +1,260 @@
+%% For double-blind review submission, w/o CCS and ACM Reference (max submission space)
+%\documentclass[sigplan,9pt,review,anonymous]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For double-blind review submission, w/ CCS and ACM Reference
+%\documentclass[sigplan,10pt,review,anonymous]{acmart}\settopmatter{printfolios=true}
+% For single-blind review submission, w/o CCS and ACM Reference (max submission space)
+\documentclass[sigplan,9pt]{acmart}
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%% For single-blind review submission, w/ CCS and ACM Reference
+%\documentclass[sigplan,10pt,review]{acmart}\settopmatter{printfolios=true}
+%% For final camera-ready submission, w/ required CCS and ACM Reference
+%\documentclass[sigplan,10pt]{acmart}\settopmatter{}
+
+
+%% Conference information
+%% Supplied to authors by publisher for camera-ready submission;
+%% use defaults for review submission.
+\acmConference[CoqPL'17]{CoqPL 2018 The Fourth International Workshop on Coq for Programming Languages}{January 13, 2018}{New York, NY, USA}
+\acmYear{2018}
+\acmISBN{} % \acmISBN{978-x-xxxx-xxxx-x/YY/MM}
+\acmDOI{} % \acmDOI{10.1145/nnnnnnn.nnnnnnn}
+\startPage{1}
+
+%% Copyright information
+%% Supplied to authors (based on authors' rights management selection;
+%% see authors.acm.org) by publisher for camera-ready submission;
+%% use 'none' for review submission.
+\setcopyright{none}
+%\setcopyright{acmcopyright}
+%\setcopyright{acmlicensed}
+%\setcopyright{rightsretained}
+%\copyrightyear{2017}           %% If different from \acmYear
+
+%% Bibliography style
+\bibliographystyle{ACM-Reference-Format}
+%% Citation style
+%\citestyle{acmauthoryear}  %% For author/year citations
+%\citestyle{acmnumeric}     %% For numeric citations
+%\setcitestyle{nosort}      %% With 'acmnumeric', to disable automatic
+                            %% sorting of references within a single citation;
+                            %% e.g., \cite{Smith99,Carpenter05,Baker12}
+                            %% rendered as [14,5,2] rather than [2,5,14].
+%\setcitesyle{nocompress}   %% With 'acmnumeric', to disable automatic
+                            %% compression of sequential references within a
+                            %% single citation;
+                            %% e.g., \cite{Baker12,Baker14,Baker16}
+                            %% rendered as [2,3,4] rather than [2-4].
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Note: Authors migrating a paper from traditional SIGPLAN
+%% proceedings format to PACMPL format must update the
+%% '\documentclass' and topmatter commands above; see
+%% 'acmart-pacmpl-template.tex'.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%% Some recommended packages.
+\usepackage{booktabs}   %% For formal tables:
+                        %% http://ctan.org/pkg/booktabs
+\usepackage{subcaption} %% For complex figures with subfigures/subcaptions
+                        %% http://ctan.org/pkg/subcaption
+\include{preamble}
+
+\begin{document}
+
+%% Title information
+\title{Linear Typing Judgments in Coq}         %% [Short Title] is optional;
+
+
+
+%% Author information
+%% Contents and number of authors suppressed with 'anonymous'.
+%% Each author should be introduced by \author, followed by
+%% \authornote (optional), \orcid (optional), \affiliation, and
+%% \email.
+%% An author may have multiple affiliations and/or emails; repeat the
+%% appropriate command.
+%% Many elements are not rendered, but should be provided for metadata
+%% extraction tools.
+
+%% Author with single affiliation.
+
+\author{Jennifer Paykin}
+\affiliation{
+  \institution{University of Pennsylvania}            %% \institution is required
+}
+\email{jpaykin@seas.upenn.edu}          %% \email is recommended
+
+\author{Robert Rand}
+\affiliation{
+  \institution{University of Pennsylvania}            %% \institution is required
+}
+\email{rrand@seas.upenn.edu}          %% \email is recommended
+
+\author{Steve Zdancewic}
+\affiliation{
+  \institution{University of Pennsylvania}            %% \institution is required
+}
+\email{stevez@cis.upenn.edu}          %% \email is recommended
+
+%% Abstract
+%% Note: \begin{abstract}...\end{abstract} environment must come
+%% before \maketitle command
+\begin{abstract}
+  Stuff
+\end{abstract}
+
+
+%% 2012 ACM Computing Classification System (CSS) concepts
+%% Generate at 'http://dl.acm.org/ccs/ccs.cfm'.
+%\begin{CCSXML}
+%<ccs2012>
+%<concept>
+%<concept_id>10011007.10011006.10011008</concept_id>
+%<concept_desc>Software and its engineering~General programming languages</concept_desc>
+%<concept_significance>500</concept_significance>
+%</concept>
+%<concept>
+%<concept_id>10003456.10003457.10003521.10003525</concept_id>
+%<concept_desc>Social and professional topics~History of programming languages</concept_desc>
+%<concept_significance>300</concept_significance>
+%</concept>
+%</ccs2012>
+%\end{CCSXML}
+
+%\ccsdesc[500]{Software and its engineering~General programming languages}
+%\ccsdesc[300]{Social and professional topics~History of programming languages}
+%% End of generated code
+
+
+%% Keywords
+%% comma separated list
+%\keywords{formal verification, type theory, quantum computing}  %% \keywords are mandatory in final camera-ready submission
+
+
+%% \maketitle
+%% Note: \maketitle command must come after title commands, author
+%% commands, abstract environment, Computing Classification System
+%% environment and commands, and keywords command.
+\maketitle
+
+\section{Introduction}
+
+When defining a simple type system in Coq, there are a large number of design
+decisions to make. What representation of variable bindings should I use? What
+representation of typing contexts? What about substitution? After all that, the
+typing judgment itself is usually not all that hard to write down and it should
+be fairly easy to (manually) prove that a particular term is well-typed.
+\jennifer{But actually, these are not the questions we are considering here.}
+
+Linear typing judgments add another layer of complexity to the equation.
+Consider a simple linear lambda calculus:
+\[
+    \inferrule*
+    {~}
+    {x:τ ⊢ x : τ}
+\quad
+    \inferrule*
+    {Γ ⋓ x:σ ⊢ e : τ}
+    {Γ ⊢ λx.e : σ ⊸ τ}
+\quad
+    \inferrule*
+    {Γ_1 ⊢ e_1 : σ ⊸ τ \\ Γ_2 ⊢ e_2 : σ}
+    {Γ_1 ⋓ Γ_2 ⊢ e_1 e_2 : τ}
+\]
+
+There are a few important differences from the simply-typed lambda calculus,
+stemming from the fact that linear variables can neither be discarded or
+duplicated.\footnote{We could also consider other substructural type systems,
+  which consider different subsets of these rules, and although the details
+  differ, many of the same principles apply.} First, in the variable rule, the
+typing context must be exactly the singleton context $x:τ$; the corresponding
+STLC rule, where $Γ ⊢ x : τ$ provided $(x:τ) ∈ Γ$, might discard additional
+variables in $Γ$, contradicting linearity. Second, in the abstraction and
+application rules, we write $Γ_1 ⋓ Γ_2$ for the \emph{partial, disjoint merge}
+of $Γ_1$ and $Γ_2$, which is undefined if $Γ_1 ∩ Γ_2 ≠ ∅$. This ensures that
+linear variables cannot be duplicated to be used on both sides of an
+application, or shadowed in the abstraction rule.
+
+Unfortunately, type checking this judgment is not so straightforward. To show
+that $Γ ⊢ e_1 e_2 : τ$, the typing context $Γ$ must be ``split'' in two disjoint
+parts, depending on which variables occur in which parts. The ordinary
+approach to linear typing judgments is to thread usage information through the
+typing judgment. For example, one might instead consider a typing judgment
+$Γ_{\text{in}} ⊢ e : τ ⟩ Γ_{\text{out}}$ where $e$ uses exactly the variables in
+$Γ_{\text{in}} \textbackslash Γ_{\text{out}}$, meaning that $Γ_{\text{in}}$ is
+thought of as ``input'' to the judgment, and $Γ_{\text{out}}$ is thought of as
+``output''. This approach works well for affine type systems (where linear
+variables may be discarded but not duplicated) but to enforce true linearity,
+one must consider a top-level judgment $Γ ⊢ e : τ ⟩ ∅$. In addition, this kind
+of typing structure is not particularly elegant for additive types \todo{cite},
+and requires serializing the typing judgment. For example, to type an
+application $e_1 e_2$, should it really matter if we type $e_1$ or $e_2$ first?
+
+On the whole, we would prefer a judgment in Coq corresponding to the natural
+presentation of linear types: $Γ ⊢ e : τ$, asserting that $e$ uses
+\emph{exactly} the variables in $Γ$. Our goal in this work is to define a linear
+typing judgment \coqe{Has_LType : Ctx -> Ty -> Prop} in Coq and be able to
+easily (automatically) discharge constraints stemming from the linearity of
+typing contexts. In addition, the technique should not rely on a particular
+representation of variable binding or typing contexts.
+
+\section{Partiality}
+
+Partial functions in Coq may take a number of forms. A partial function might be
+represented as an inductive relation, which has the disadvantage that the result
+cannot be computed on concrete inputs. On the other hand, a partial function
+might be represented as a function to the option type, which has the
+disadvantage of obscuring compositionality, since composition must be surrounded
+by the monadic bind. A third option is to lift the partiality to all data
+values, so that disjoint merge is total, but may produce an ``undefined''
+typing context as a result. This third option is the approach we take in this paper.
+\jennifer{I don't think this paragraph is super clear}
+
+Thus, we can define the linear typing judgment in Coq as follows:
+\begin{coq}
+Inductive Has_LType : Ctx -> Ty -> Prop :=
+| L_Var : ∀ Γ x τ, Γ = singleton x τ ->
+                   Has_LType Γ (Var x) τ
+| L_Abs : ∀ Γ x e σ, Γ ⋓ singleton x σ ≠ undefined ->
+                     Has_LType (Γ ⋓ singleton x σ) e τ ->
+                     Has_LType Γ (Abs x e) (σ ⊸ τ)
+| L_App : ∀ Γ1 Γ2 Γ e1 e2 σ τ, Γ1 ⋓ Γ2 = Γ -> Γ ≠ undefined ->
+                               Has_LType Γ1 e1 (σ ⊸ τ) ->
+                               Has_LType Γ2 e2 σ ->
+                               Has_LType Γ (App e1 e2) τ.
+\end{coq}
+
+\todo{As a running example, try to type something.}
+
+
+
+%% Acknowledgments
+\begin{acks}                            %% acks environment is optional
+                                        %% contents suppressed with 'anonymous'
+  %% Commands \grantsponsor{<sponsorID>}{<name>}{<url>} and
+  %% \grantnum[<url>]{<sponsorID>}{<number>} should be used to
+  %% acknowledge financial support and will be used by metadata
+  %% extraction tools.
+  This material is based upon work supported by the
+  \grantsponsor{GS100000001}{National Science
+    Foundation}{http://dx.doi.org/10.13039/100000001} under Grant
+  No.~\grantnum{GS100000001}{nnnnnnn} and Grant
+  No.~\grantnum{GS100000001}{mmmmmmm}.  Any opinions, findings, and
+  conclusions or recommendations expressed in this material are those
+  of the author and do not necessarily reflect the views of the
+  National Science Foundation.
+\end{acks}
+
+
+%% Bibliography
+\bibliography{bibliography}
+
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

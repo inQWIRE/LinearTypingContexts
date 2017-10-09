@@ -1,0 +1,248 @@
+% Created by CM Lubinski. 
+% https://github.com/cmc333333/forensics-thesis/blob/master/lstcoq.sty
+
+% lstlisting coq style (inspired from a file of Assia Mahboubi)
+%
+
+%\usepackage{cmll} % Linear logic symbols
+%\usepackage{ stmaryrd } % more math symbols
+\usepackage{amsfonts}
+\usepackage{braket}
+
+
+\lstdefinelanguage{Coq}{ 
+%
+% Escape to LaTeX
+escapeinside={(|}{|)},
+%
+% Anything betweeen $ becomes LaTeX math mode
+mathescape=true,
+%
+% Comments may or not include Latex commands
+texcl=false, 
+%
+% Vernacular commands
+morekeywords=[1]{Section, Module, End, Require, Import, Export,
+  Variable, Variables, Parameter, Parameters, Axiom, Hypothesis,
+  Hypotheses, Notation, Local, Tactic, Reserved, Scope, Open, Close,
+  Bind, Delimit, Definition, Let, Ltac, Fixpoint, CoFixpoint, Add,
+  Morphism, Relation, Implicit, Arguments, Unset, Contextual,
+  Strict, Prenex, Implicits, Inductive, CoInductive, Record,
+  Structure, Canonical, Coercion, Context, Class, Global, Instance,
+  Program, Infix, Theorem, Lemma, Corollary, Proposition, Fact,
+  Remark, Example, Proof, Goal, Save, Qed, Defined, Abort, Hint, Resolve,
+  Rewrite, View, Search, Show, Print, Printing, All, Eval, Check,
+  Projections, inside, outside, Def},
+%
+% Gallina
+morekeywords=[2]{forall, exists, exists2, fun, fix, cofix, struct,
+  match, with, end, as, in, return, let, if, is, then, else, for, of,
+  nosimpl, when},
+%
+% Sorts
+morekeywords=[3]{Type, Prop, Set, true, false, option},
+%
+% Various tactics, some are std Coq subsumed by ssr, for the manual purpose
+morekeywords=[4]{pose, set, move, case, elim, apply, clear, hnf,
+  intro, intros, generalize, rename, pattern, after, destruct,
+  induction, using, refine, inversion, injection, rewrite, congr,
+  unlock, compute, ring, field, fourier, replace, fold, unfold,
+  change, cutrewrite, simpl, have, suff, wlog, suffices, without,
+  loss, nat_norm, assert, cut, trivial, revert, bool_congr, nat_congr,
+  symmetry, transitivity, auto, split, left, right, autorewrite},
+%
+% Terminators
+morekeywords=[5]{by, done, exact, reflexivity, tauto, romega, omega,
+  assumption, solve, contradiction, discriminate},
+%
+% Control
+morekeywords=[6]{do, last, first, try, idtac, repeat},
+%
+% Comments delimiters, we do turn this off for the manual
+morecomment=[s]{(*}{*)},
+%
+% Spaces are not displayed as a special character
+showstringspaces=false,
+%
+% String delimiters
+% Quote delimiters turned off due to conflict with Coq notations and literate=*.
+% morestring=[b]", 
+morestring=[d],
+%
+% Size of tabulations
+tabsize=3,
+%
+% Enables ASCII chars 128 to 255
+extendedchars=true,
+%
+% Case sensitivity
+sensitive=true,
+%
+upquote=true,
+%
+% Automatic breaking of long lines
+breaklines=false,
+%
+% Default style fors listings
+basicstyle=\small\ttfamily,
+%
+% Position of captions is bottom
+captionpos=b,
+%
+% flexible columns
+columns=fullflexible,
+keepspaces=true,
+%
+% Style for (listings') identifiers
+identifierstyle={\ttfamily\color{black}},
+% Style for declaration keywords
+keywordstyle=[1]{\ttfamily\color{dkviolet}},
+% Style for gallina keywords
+keywordstyle=[2]{\ttfamily\color{dkgreen}},
+% Style for sorts keywords
+keywordstyle=[3]{\ttfamily\color{ltblue}},
+% Style for tactics keywords
+keywordstyle=[4]{\ttfamily\color{dkblue}},
+% Style for terminators keywords
+keywordstyle=[5]{\ttfamily\color{dkred}},
+%Style for iterators
+%keywordstyle=[6]{\ttfamily\color{dkpink}},
+% Style for strings
+stringstyle=\ttfamily,
+% Style for comments
+commentstyle={\ttfamily\color{dkgreen}},
+%
+%moredelim=**[is][\ttfamily\color{red}]{/&}{&/},
+literate= %*
+    {\\forall}{{\color{dkgreen}{$\forall\;$}}}1
+    {\\exists}{{$\exists\;$}}1
+    {==}{{\code{==}\;}}1
+    {==>}{{\code{==>}\;}}1
+%    {:>}{{\code{:>}\;}}1
+    {->}{{$\rightarrow$}}2
+    {<->}{{$\leftrightarrow\;$}}2
+    {<==}{{$\leq\;$}}1
+    {\#}{{$^\star$}}1 
+    {\\o}{{$\circ\;$}}1 
+%    {\@}{{$\cdot$}}1 
+    {\/\\}{{$\wedge\;$}}1
+    {\\\/}{{$\vee\;$}}1
+    {++}{{\code{++}}}1
+    {~}{{$\lnot$}}1
+    {\@\@}{{$@$}}1
+    {↦}{{$\mapsto\;$}}1
+    {\\hline}{{\rule{\linewidth}{0.5pt}}}1
+    {∘}{{$\circ$}}1
+    %NEW
+{+}{{$+$}}1 {/}{{$/$}}1 
+%{*}{{$*$}}1 % This breaks comments (at least outside literate=*)!
+               {=}{{$=$}}1 %{/=}{{$\neg$}}1
+               {≠}{{$\neq$}}1
+               {>}{{$>$}}1 {<}{{$<$}}1 
+%               {\\}{{$\lambda$}}1
+               {++}{{$+\!\!\!+$}}1
+               {\\\\}{{\char`\\\char`\\}}1
+               {>=}{{$\geq$}}2 
+               {<-}{{$\leftarrow$}}2
+               {←}{{$\leftarrow$}}2
+               {<=}{{$\leq$}}2 {=>}{{$\Rightarrow$}}2
+               {-<}{{$\leftY$}}1 
+               {=>>=}{{$\lbind$}}2
+               {<<}{{$\ll$}}2 {>>}{{$\gg$}}2 {>>=}{{$>\!\!>\!\!=$}}2
+               {<<<}{{$\lll$}}2 {>>>}{{$\ggg$}}2 {^<<}{{$\hat{}\!\!\ll$}}2 {^>>}{{$\hat{}\!\!\gg$}}2
+               {⟩}{{$\rangle$}}1 {⟨}{{$\langle$}}1
+               {undefined}{{$\bot$}}1
+%               {not\ }{{$\neg$}}1
+               {^}{{$^\wedge$}}2
+               {`elem`}{{$\in$}}1
+               {⊢}{{$\vdash$}}2
+               {forall}{{$\forall$}}1
+               {∀}{{$\forall$}}1
+               {nat}{{$\mathbb{N}$}}1
+               {⋯}{{$\cdots$}}2
+               {⊸}{{$\multimap$}}2
+               {↝}{{$\leadsto$}}2
+               {⊕}{{$\oplus$}}1
+               {\\Cup}{{$\Cup$}}2
+               {⋓}{{$\Cup$}}2
+               {∏}{{$\prod$}}2
+%               {∅}{{$\emptyset$}}1
+                {α}{{$\alpha$}}1
+                {β}{{$\beta$}}1
+                {δ}{{$\delta$}}1
+                {ε}{{$\epsilon$}}1
+                {\\Sigma}{{$\Sigma$}}1
+                {Σ}{{$\Sigma$}}1
+                {\\Gamma}{{$\Gamma$}}1
+                {=>}{{$\Rightarrow$}}1
+                {⇒}{{$\Rightarrow$}}1
+                {\\Rightarrow}{{$\Rightarrow$}}1
+                {\\rho}{{${\tt\rho}$}}1
+                {ρ}{{${\tt\rho}$}}1
+                {×}{{$\times$}}1
+                {⊗}{{$\otimes$}}1
+                {⨂}{{$\bigotimes$}}1
+                {\\lambda}{{$\lambda$}}1
+                {λ}{{$\lambda$}}1
+                {\\top}{{$\top$}}1
+                {⊤}{{$\top$}}1
+                {†}{{$\dagger$}}1
+%                {Prop}{{$\mathbb{P}$}}1
+                {\\RR}{{$\mathbb{R}$}}1                
+                {\\CC}{{$\mathbb{C}$}}1                
+                {[[}{{$\llbracket$}}1    
+                {]]}{{$\rrbracket$}}1  
+                {〚}{{$\llbracket$}}1    
+                {〛}{{$\rrbracket$}}1  
+                {/\\}{{$\wedge$}}1
+                {\\k0}{{$\ket{0}$}}1
+                {\\k1}{{$\ket{1}$}}1
+                {|0⟩}{{$\ket{0}$}}1
+                {|1⟩}{{$\ket{1}$}}1
+                {\\b0}{{$\bra{0}$}}1
+                {\\b1}{{$\bra{1}$}}1
+                {⟨0|}{{$\bra{0}$}}1
+                {⟨1|}{{$\bra{1}$}}1
+                {Γ}{{$\Gamma$}}1
+                {Γ0}{{$\Gamma_{\mathtt{0}}$}}1
+                {Γ1}{{$\Gamma_{\mathtt{1}}$}}1
+                {Γ2}{{$\Gamma_{\mathtt{2}}$}}1
+%                {σx}{{$\mathtt{\sigma}_{\mathtt{x}}$}}1
+%                {σy}{{$\mathtt{\sigma}_{\mathtt{y}}$}}1
+%                {σz}{{$\mathtt{\sigma}_{\mathtt{z}}$}}1
+                {σ}{{$\sigma$}}1
+                {τ}{{$\tau$}}1
+                {ρ0}{{$\rho_{\mathtt{0}}$}}1
+                {ρ1}{{$\rho_{\mathtt{1}}$}}1
+                {ρ2}{{$\rho_{\mathtt{2}}$}}1
+                {W0}{{$\mathtt{W}_{\mathtt{0}}$}}1
+                {W1}{{$\mathtt{W}_{\mathtt{1}}$}}1
+                {W2}{{$\mathtt{W}_{\mathtt{2}}$}}1
+                {C1}{{$\mathtt{C}_{\mathtt{1}}$}}1
+                {C2}{{$\mathtt{C}_{\mathtt{2}}$}}1
+                {Q1}{{$\mathtt{Q}_{\mathtt{1}}$}}1
+                {Q2}{{$\mathtt{Q}_{\mathtt{2}}$}}1
+                {Γ_n}{{${\tt \Gamma}_{\mathtt{n}}$}}1
+                {Γ_m}{{${\tt \Gamma}_{\mathtt{m}}$}}1
+                {Γ_i}{{${\tt \Gamma}_{\mathtt{i}}$}}1
+                {Γ_j}{{${\tt \Gamma}_{\mathtt{j}}$}}1
+                {p_i}{{${\tt p}_{\mathtt{i}}$}}1
+                {W_i}{{${\tt W}_{\mathtt{i}}$}}1
+                {\\_}{{$\_$}}1
+%                {''}{{"}}1
+%                {'}{{$'$}}1
+%
+}[keywords,comments,strings]
+
+\lstnewenvironment{coq}{\lstset{language=Coq}}{}
+
+% pour inliner dans le texte
+\def\coqe{\lstinline[language=Coq, basicstyle=\small]}
+% pour inliner dans les tableaux / displaymath...
+\def\coqes{\lstinline[language=Coq, basicstyle=\scriptsize]}
+
+%%% Local Variables: 
+%%% mode: latex
+%%% Local IspellDict: british
+%%% TeX-master: "main.tex"
+%%% End: 
