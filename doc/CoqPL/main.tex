@@ -320,9 +320,9 @@ higher-order abstract syntax representations of variable binding.
 \label{sec:validity}
 
 To prove statements of the form \coqe{is_valid Γ}, we introduce a boolean-valued
-function \coqe{validity Γ}, and define \coqe{is_valid Γ} to be \coqe{validity Γ
-  = true}. We then define a number of axioms describing the behavior of validity
-with respect to the element of the partial monoid.
+function \coqe{validity Γ}, and define \coqe{is_valid Γ} to be %
+\coqe{validity Γ = true}. We then define a number of axioms describing the
+behavior of validity with respect to the element of the partial monoid.
 \begin{coq}
 Class TypingContext (X A Ctx : Type) :=
   { singleton : X -> A -> Ctx
