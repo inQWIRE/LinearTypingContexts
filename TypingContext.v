@@ -269,7 +269,7 @@ Ltac eq_to_beq :=
     rewrite (neq_bdec_false _ x y H)
   | [ H : ?x <> ?y |- context[?y =? ?x] ] =>
     rewrite (neq_bdec_false _ y x (not_eq_sym H))
-  end; auto.
+  end.
 
 
 Ltac validate :=
@@ -278,8 +278,10 @@ Ltac validate :=
   repeat rewrite M_assoc;
   repeat rewrite M_unit;
   repeat rewrite validity3;
+  repeat rewrite validity_top;
+  repeat rewrite validity_singleton;
   repeat rewrite validity_singleton_merge;
-  eq_to_beq.
+  eq_to_beq; auto.
 
 Section Tests.
 

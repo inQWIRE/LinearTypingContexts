@@ -182,12 +182,12 @@ that $Γ ⊢ e_1 e_2 : τ$, the typing context $Γ$ must be ``split'' in two dis
 parts, depending on which variables occur in which parts. The ordinary
 approach to linear typing judgments is to thread usage information through the
 typing judgment. For example, one might instead consider a typing judgment
-$Γ_{\text{in}} ⊢ e : τ ⟩ Γ_{\text{out}}$ where $e$ uses exactly the variables in
+$Γ_{\text{in}} ⊢ e : τ > Γ_{\text{out}}$ where $e$ uses exactly the variables in
 $Γ_{\text{in}} \textbackslash Γ_{\text{out}}$, meaning that $Γ_{\text{in}}$ is
 thought of as ``input'' to the judgment, and $Γ_{\text{out}}$ is thought of as
 ``output''. This approach works well for affine type systems (where linear
 variables may be discarded but not duplicated) but to enforce true linearity,
-one must consider a top-level judgment $Γ ⊢ e : τ ⟩ ∅$. In addition, this kind
+one must consider a top-level judgment $Γ ⊢ e : τ > ∅$. In addition, this kind
 of typing structure is not particularly elegant for additive types \todo{cite},
 and requires serializing the typing judgment. For example, to type an
 application $e_1 e_2$, should it really matter if we type $e_1$ or $e_2$ first?
@@ -208,7 +208,7 @@ cannot be computed on concrete inputs. On the other hand, a partial function
 might be represented as a function to the option type, which has the
 disadvantage of obscuring compositionality, since composition must be surrounded
 by the monadic bind. A third option is to lift the partiality to all data
-values, so that disjoint merge is total, but may produce an ``undefined''
+values, so that disjoint merge is total, but may produce an invalid or undefined
 typing context as a result. This third option is the approach we take in this paper.
 \jennifer{I don't think this paragraph is super clear}
 
@@ -217,35 +217,160 @@ Thus, we can define the linear typing judgment in Coq as follows:
 Inductive Has_LType : Ctx -> Ty -> Prop :=
 | L_Var : ∀ Γ x τ, Γ = singleton x τ ->
                    Has_LType Γ (Var x) τ
-| L_Abs : ∀ Γ x e σ, Γ ⋓ singleton x σ ≠ undefined ->
+| L_Abs : ∀ Γ x e σ, is_valid (Γ ⋓ singleton x σ) ->
                      Has_LType (Γ ⋓ singleton x σ) e τ ->
                      Has_LType Γ (Abs x e) (σ ⊸ τ)
-| L_App : ∀ Γ1 Γ2 Γ e1 e2 σ τ, Γ1 ⋓ Γ2 = Γ -> Γ ≠ undefined ->
+| L_App : ∀ Γ1 Γ2 Γ e1 e2 σ τ, Γ1 ⋓ Γ2 = Γ -> is_valid Γ ->
                                Has_LType Γ1 e1 (σ ⊸ τ) ->
                                Has_LType Γ2 e2 σ ->
                                Has_LType Γ (App e1 e2) τ.
 \end{coq}
 
-\todo{As a running example, try to type something.}
+Consider trying to type the program $λx.λy.y x$. In Coq, the goal is expressed
+as follows:
+\begin{coq}
+    forall x y σ τ, x ≠ y -> 
+    Has_LType ∅ (Abs x (Abs y (App (Var y) (Var x)))) 
+                (σ ⊸ (σ ⊸ τ) ⊸ τ)
+\end{coq} 
+Applying the abstraction constructors in sequence, we obtain the following goals:
+\begin{coq}
+  1) is_valid (∅ ⋓ singleton x σ)
+  2) is_valid (∅ ⋓ singleton x σ ⋓ singleton y (σ ⊸ τ))
+  3) Has_LType (∅ ⋓ singleton x σ ⋓ singleton y (σ ⊸ τ)) 
+               (App (Var y) (Var x)) τ
+\end{coq}
+We discuss how to solve goals of the form \coqe{is_valid Γ} in
+\cref{sec:validity}. To progress with goal 3, we run into the problem described
+in the introduction: how can an automatic type-checker guess the values of
+\coqe{Γ1} and \coqe{Γ2} (and, for that matter, the value of $σ$)? 
+
+Coq's existential variables (\coqe{Evars}) provide a solution here; we defer the
+instantiation of \coqe{Γ1} and \coqe{Γ2} to later, and use the tactic
+\coqe{eapply L_App}. This introduces four new goals:
+\begin{coq}
+  4) ?Γ1 ⋓ ?Γ2 = (∅ ⋓ singleton x σ ⋓ singleton y (σ ⊸ τ))
+  5) is_valid (∅ ⋓ singleton x σ ⋓ singleton y (σ ⊸ τ))
+  6) Has_LType ?Γ1 (Var y) (?σ0 ⊸ τ)
+  7) Has_LType ?Γ2 (Var x) ?σ0
+\end{coq}
+Clearly, goals 6 and 7 can be discharged using the \coqe{LVar} constructor,
+which resolves the \coqe{Evars} we introduced, and we are left with a revised
+goal 4: 
+\begin{coq}
+  4) singleton y (σ ⊸ τ) ⋓ singleton x σ 
+  = ∅ ⋓ singleton x σ ⋓ singleton y (σ ⊸ τ)
+\end{coq}
+
+The typing rules thus introduce two new kinds of constraints: showing that two
+contexts are equal, and showing that a context is valid.
+
+\section{Equality of typing contexts}
+\label{sec:monoid}
+
+The equality of typing contexts can be described as a partial commutative
+monoid---that is, a commutative monoid $(⊤,∙)$ along with a zero element $⊥$
+such that for all $a$, $a ∙ ⊥ = ⊥$. We characterize this structure as a type
+class:
+\begin{coq}
+Class PCM A :=
+    { one  : A
+    ; zero : A
+    ; m    : A -> A -> A }.
+Notation "⊥" := zero.
+Notation "⊤" := one.
+Notation "a ∙ b" := (m a b) (left associativity, at level 20).
+Class PCM_Laws A `{PCM A} :=
+  { M_unit  : forall a, a ∙ ⊤ = a
+  ; M_assoc : forall a b c, a ∙ (b ∙ c) = (a ∙ b) ∙ c
+  ; M_comm  : forall a b, a ∙ b = b ∙ a
+  ; M_absorb : forall a, a ∙ ⊥ = ⊥ 
+  }.
+\end{coq}
+
+\citet{chlipala2013} describes a series of tactics for solving monoidal
+equations using reflection, which we adapt to the partial commutative monoid
+case. First, an LTac tactic reifies a term as a list of base variables, ignoring
+units \coqe{⊤}, flattening out the associativity of $∙$, and collapsing to $⊥$
+if it occurs anywhere in the term
+\begin{coq}
+Ltac reify a :=
+  match a with
+  | ⊤ => constr:(Some [])
+  | ⊥ => constr:(None)
+  | ?a1 ∙ ?a2 => let e1 := reify a1 in
+                 let e2 := reify a2 in
+                 match e1, e2 with
+                 | Some ls1, Some ls2 => constr:(Some (ls1 ++ ls2))
+                 | _, _ => constr:(None)
+                 end
+  | _ => constr:(Some [a])
+  end.
+\end{coq}
+A goal \coqe{a1 = a2} can then be exchanged with one of the form %
+\coqe{from_list ls1 = from_list ls2} where \coqe{lsi} is the result of calling
+\coqe{reify} on \coqe{ai}. If both sides successfully resolve to lists, it
+suffices to check whether the two are permutations of each other.
+
+We can also deal with evars in the list, which is useful when considering
+higher-order abstract syntax representations of variable binding.
+
+
+\section{Validity of typing contexts}
+\label{sec:validity}
+
+To prove statements of the form \coqe{is_valid Γ}, we introduce a boolean-valued
+function \coqe{validity Γ}, and define \coqe{is_valid Γ} to be \coqe{validity Γ
+  = true}. We then define a number of axioms describing the behavior of validity
+with respect to the element of the partial monoid.
+\begin{coq}
+Class TypingContext (X A Ctx : Type) :=
+  { singleton : X -> A -> Ctx
+  ; validity : Ctx -> bool }.
+Class TypingContext_Laws X A Ctx `{PCM_Ctx : PCM_Laws Ctx} `{TypingContext X A} :=
+  { validity3 : forall Γ1 Γ2 Γ3, 
+    validity (Γ1 ∙ Γ2 ∙ Γ3) =  validity (Γ1 ∙ Γ2) 
+                            && validity (Γ1 ∙ Γ3) 
+                            && validity (Γ2 ∙ Γ3)
+  ; validity_reflection : forall Γ, validity Γ = false <-> Γ = ⊥
+  ; validity_singleton : forall x a, validity (singleton x a) = true
+  ; validity_top : validity ⊤ = true
+  ; validity_singleton_merge : forall x y a b, 
+    validity (singleton x a ∙ singleton y b) = (x ≠? y) }. 
+\end{coq}
+The \coqe{validity3} axiom says that the merge of three typing contexts is
+valid if and only if every binary combination is valid. The
+\coqe{validity_reflection} axiom says that the only invalid context is the
+undefined context. The next two axioms say that singleton contexts and the empty
+context are both valid, and the final axiom says that the merge of two singleton
+contexts is valid if and only if their domains are disjoint. The \coqe{validate}
+tactic simply rewrites the target by these lemmas. For example, showing the
+validity of goal (4) above, that
+\begin{coq}
+    is_valid (∅ ⋓ singleton x σ ⋓ singleton y (σ ⊸ τ))
+\end{coq}
+reduces to showing that \coqe{x ≠? y = true}, which we can conclude from the
+hypothesis that \coqe{x ≠ y}.
 
 
 
-%% Acknowledgments
-\begin{acks}                            %% acks environment is optional
-                                        %% contents suppressed with 'anonymous'
-  %% Commands \grantsponsor{<sponsorID>}{<name>}{<url>} and
-  %% \grantnum[<url>]{<sponsorID>}{<number>} should be used to
-  %% acknowledge financial support and will be used by metadata
-  %% extraction tools.
-  This material is based upon work supported by the
-  \grantsponsor{GS100000001}{National Science
-    Foundation}{http://dx.doi.org/10.13039/100000001} under Grant
-  No.~\grantnum{GS100000001}{nnnnnnn} and Grant
-  No.~\grantnum{GS100000001}{mmmmmmm}.  Any opinions, findings, and
-  conclusions or recommendations expressed in this material are those
-  of the author and do not necessarily reflect the views of the
-  National Science Foundation.
-\end{acks}
+
+% %% Acknowledgments
+% \begin{acks}                            %% acks environment is optional
+%                                         %% contents suppressed with 'anonymous'
+%   %% Commands \grantsponsor{<sponsorID>}{<name>}{<url>} and
+%   %% \grantnum[<url>]{<sponsorID>}{<number>} should be used to
+%   %% acknowledge financial support and will be used by metadata
+%   %% extraction tools.
+%   This material is based upon work supported by the
+%   \grantsponsor{GS100000001}{National Science
+%     Foundation}{http://dx.doi.org/10.13039/100000001} under Grant
+%   No.~\grantnum{GS100000001}{nnnnnnn} and Grant
+%   No.~\grantnum{GS100000001}{mmmmmmm}.  Any opinions, findings, and
+%   conclusions or recommendations expressed in this material are those
+%   of the author and do not necessarily reflect the views of the
+%   National Science Foundation.
+% \end{acks}
 
 
 %% Bibliography
