@@ -57,6 +57,28 @@ Section DecidablePaths.
     intros x. apply bdec_eq. auto.
   Qed.
 
+  Lemma eq_bdec_true : forall x y, x = y -> x =? y = true.
+  Proof. intros. apply bdec_eq. auto. Qed.
+  Lemma neq_bdec_false : forall x y, x <> y -> x =? y = false.
+  Proof. intros. apply Bool.negb_true_iff.
+                 apply bdec_neq. auto.
+  Qed.
+  Lemma eq_bdec_false : forall x y, x = y -> x <>? y = false.
+  Proof.
+    intros.
+    apply Bool.negb_true_iff.
+    rewrite Bool.negb_involutive.
+    apply bdec_eq. auto.
+  Qed.
+  Lemma neq_bdec_true : forall x y, x <> y -> x =? y = false.
+  Proof.
+    intros.
+    apply Bool.negb_true_iff.
+    apply bdec_neq. auto.
+  Qed.
+
+
+
 End DecidablePaths.
 
 Class TypingContext_Laws X A Ctx `{DecidablePaths X} 
@@ -215,13 +237,49 @@ Ltac introduce_valid_term Γ :=
                        let Γ' := fresh "Γ" in
                        remember Γ as Γ'
   end; subst.
+Search (?x =? ?y).
 
+
+(*
 Ltac validate :=
   repeat rewrite M_assoc;
   match goal with
   | [ |- is_valid ?Γ ] => introduce_valid_term Γ
   end; auto.
+*)
 
+(* This new tactic uses rewriting *)
+
+Ltac eq_to_beq :=
+  repeat match goal with
+  | [H : ?x = ?y |- context[?x =? ?y] ] => 
+    rewrite (eq_bdec_true _ x y H)
+  | [H : ?x = ?y |- context[?y =? ?x] ] => 
+    rewrite (eq_bdec_true _ y x (eq_sym H))
+  | [H : ?x = ?y |- context[?x <>? ?y] ] => 
+    rewrite (eq_bdec_false _ x y H)
+  | [H : ?x = ?y |- context[?y <>? ?x] ] =>
+    rewrite (eq_bdec_false _ y x (eq_sym H))
+
+  | [H : ?x <> ?y |- context[?x <>? ?y] ] =>
+    rewrite (neq_bdec_true _ x y H)
+  | [H : ?x <> ?y |- context[?y <>? ?x] ] =>
+    rewrite (neq_bdec_true _ y x (not_eq_sym H))
+  | [ H : ?x <> ?y |- context[?x =? ?y] ] =>
+    rewrite (neq_bdec_false _ x y H)
+  | [ H : ?x <> ?y |- context[?y =? ?x] ] =>
+    rewrite (neq_bdec_false _ y x (not_eq_sym H))
+  end; auto.
+
+
+Ltac validate :=
+  intros;
+  unfold is_valid in *;
+  repeat rewrite M_assoc;
+  repeat rewrite M_unit;
+  repeat rewrite validity3;
+  repeat rewrite validity_singleton_merge;
+  eq_to_beq.
 
 Section Tests.
 
@@ -230,14 +288,14 @@ Context X A Ctx `{TypingContext_Laws X A Ctx}.
 Lemma test3 : forall x y z a b c, x <> y -> y <> z -> x <> z ->
              is_valid (singleton x a ∙ singleton y b ∙ singleton z c).
 Proof.
-  intros. validate. 
+  validate.
 Qed.
 
 
 Lemma test4 : forall x y z w a b c d, x <> y -> y <> z -> x <> z -> x <> w -> y <> w -> z <> w ->
              is_valid (singleton x a ∙ singleton y b ∙ singleton z c ∙ singleton w d).
 Proof.
-  intros. validate. 
+  validate. 
 Qed.
 
 End Tests.

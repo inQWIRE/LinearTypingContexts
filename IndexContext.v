@@ -271,7 +271,7 @@ Example test' : forall x y a b, x <> y ->
     singleton x a ⊎ singleton y b == singleton y b ∙ singleton x a ∙ (⊤ : IdxCtx A).
 Proof.
   intros.
-  solve_ctx. 
+  solve_ctx.
 Defined.
 
 End Tests.
