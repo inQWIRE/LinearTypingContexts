@@ -142,8 +142,8 @@
 \section{Introduction}
 
 When defining a simple type system in Coq, there are a large number of design
-decisions to make. What representation of variable bindings should I use? What
-representation of typing contexts? What about substitution? After all that, the
+decisions to make. How should I represent variable bindings? What
+about typing contexts? What approach should I take to substitution? After all that, the
 typing judgment itself is usually not all that hard to write down and it should
 be fairly easy to (manually) prove that a particular term is well-typed.
 \jennifer{But actually, these are not the questions we are considering here.}
@@ -161,7 +161,7 @@ Consider a simple linear lambda calculus:
 \quad
     \inferrule*
     {Γ_1 ⊢ e_1 : σ ⊸ τ \\ Γ_2 ⊢ e_2 : σ}
-    {Γ_1 ⋓ Γ_2 ⊢ e_1 e_2 : τ}
+    {Γ_1 ⋓ Γ_2 ⊢ e_1 \; e_2 : τ}
 \]
 
 There are a few important differences from the simply-typed lambda calculus,
@@ -178,19 +178,20 @@ linear variables cannot be duplicated to be used on both sides of an
 application, or shadowed in the abstraction rule.
 
 Unfortunately, type checking this judgment is not so straightforward. To show
-that $Γ ⊢ e_1 e_2 : τ$, the typing context $Γ$ must be ``split'' in two disjoint
+that $Γ ⊢ e_1 \; e_2 : τ$, the typing context $Γ$ must be ``split'' in two disjoint
 parts, depending on which variables occur in which parts. The ordinary
 approach to linear typing judgments is to thread usage information through the
 typing judgment. For example, one might instead consider a typing judgment
 $Γ_{\text{in}} ⊢ e : τ > Γ_{\text{out}}$ where $e$ uses exactly the variables in
 $Γ_{\text{in}} \textbackslash Γ_{\text{out}}$, meaning that $Γ_{\text{in}}$ is
 thought of as ``input'' to the judgment, and $Γ_{\text{out}}$ is thought of as
-``output''. This approach works well for affine type systems (where linear
+``output''. This approach works well for \emph{affine} type systems (where linear
 variables may be discarded but not duplicated) but to enforce true linearity,
-one must consider a top-level judgment $Γ ⊢ e : τ > ∅$. In addition, this kind
-of typing structure is not particularly elegant for additive types \todo{cite},
+one must consider a top-level judgment $Γ ⊢ e : τ > ∅$ \robert{hard to understand. 
+Maybe just say  $Γ_{\text{out}}$ must be empty?}. In addition, this kind
+of typing structure is not particularly elegant for additive types \todo{cite}\robert{maybe describe?},
 and requires serializing the typing judgment. For example, to type an
-application $e_1 e_2$, should it really matter if we type $e_1$ or $e_2$ first?
+application $e_1 \; e_2$, should it really matter if we type $e_1$ or $e_2$ first?
 
 On the whole, we would prefer a judgment in Coq corresponding to the natural
 presentation of linear types: $Γ ⊢ e : τ$, asserting that $e$ uses
@@ -203,16 +204,21 @@ representation of variable binding or typing contexts.
 \section{Partiality}
 
 Partial functions in Coq may take a number of forms. A partial function might be
-represented as an inductive relation, which has the disadvantage that the result
+represented as an inductive relation, but this has the disadvantage that the result
 cannot be computed on concrete inputs. On the other hand, a partial function
 might be represented as a function to the option type, which has the
 disadvantage of obscuring compositionality, since composition must be surrounded
-by the monadic bind. A third option is to lift the partiality to all data
-values, so that disjoint merge is total, but may produce an invalid or undefined
-typing context as a result. This third option is the approach we take in this paper.
-\jennifer{I don't think this paragraph is super clear}
+by the monadic bind. We can address this by lifting our partial function to options 
+themselves, creating a total function on the domain plus $\bot$. We use this approach 
+to write our disjoint merge operation.
+\robert{A bit better? Note that there isn't a transition - it's not immediately clear why we're talking about partial functions.}
+%A third option is to lift the partiality to all data
+%values, so that disjoint merge is total, but may produce an invalid or undefined
+%typing context as a result. This third option is the approach we take in this paper.
+%\jennifer{I don't think this paragraph is super clear}
 
 Thus, we can define the linear typing judgment in Coq as follows:
+\robert{Is this in the Coq development? I couldn't find it. It looks like Has\_LType should have 3 arguments though: A context, a term and a type.}
 \begin{coq}
 Inductive Has_LType : Ctx -> Ty -> Prop :=
 | L_Var : ∀ Γ x τ, Γ = singleton x τ ->
@@ -245,7 +251,7 @@ We discuss how to solve goals of the form \coqe{is_valid Γ} in
 in the introduction: how can an automatic type-checker guess the values of
 \coqe{Γ1} and \coqe{Γ2} (and, for that matter, the value of $σ$)? 
 
-Coq's existential variables (\coqe{Evars}) provide a solution here; we defer the
+Coq's existential variables (\coqe{evars}) provide a solution here; we defer the
 instantiation of \coqe{Γ1} and \coqe{Γ2} to later, and use the tactic
 \coqe{eapply L_App}. This introduces four new goals:
 \begin{coq}
@@ -268,6 +274,7 @@ contexts are equal, and showing that a context is valid.
 \section{Equality of typing contexts}
 \label{sec:monoid}
 
+\robert{Using bottom but calling it zero seems confusing to me. Why not just use 0 and 1?}
 The equality of typing contexts can be described as a partial commutative
 monoid---that is, a commutative monoid $(⊤,∙)$ along with a zero element $⊥$
 such that for all $a$, $a ∙ ⊥ = ⊥$. We characterize this structure as a type
@@ -314,6 +321,7 @@ suffices to check whether the two are permutations of each other.
 
 We can also deal with evars in the list, which is useful when considering
 higher-order abstract syntax representations of variable binding.
+\robert{Explain? Isn't this useful for instantiating unknown contexts?}
 
 
 \section{Validity of typing contexts}
@@ -332,7 +340,7 @@ Class TypingContext_Laws X A Ctx `{PCM_Ctx : PCM_Laws Ctx} `{TypingContext X A} 
     validity (Γ1 ∙ Γ2 ∙ Γ3) =  validity (Γ1 ∙ Γ2) 
                             && validity (Γ1 ∙ Γ3) 
                             && validity (Γ2 ∙ Γ3)
-  ; validity_reflection : forall Γ, validity Γ = false <-> Γ = ⊥
+  ; validity_reflection : forall Γ, validity Γ = false ↔ Γ = ⊥
   ; validity_singleton : forall x a, validity (singleton x a) = true
   ; validity_top : validity ⊤ = true
   ; validity_singleton_merge : forall x y a b, 
