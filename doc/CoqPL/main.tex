@@ -141,27 +141,40 @@
 
 \section{Introduction}
 
-When defining a simple type system in Coq, there are a large number of design
-decisions to make. How should I represent variable bindings? What
-about typing contexts? What approach should I take to substitution? After all that, the
-typing judgment itself is usually not all that hard to write down and it should
-be fairly easy to (manually) prove that a particular term is well-typed.
-\jennifer{But actually, these are not the questions we are considering here.}
+% Linear type systems have successfully been used in the past thirty years to
+% safely program with a variety of effects including mutable state, memory
+% management, concurrency, and quantum computing. 
 
-Linear typing judgments add another layer of complexity to the equation.
-Consider a simple linear lambda calculus:
+\jennifer{The terminology is really bad in this section}
+
+In the literature on linear type systems, two main perspectives have emerged. In
+the ``kind'' perspective, data has either a linear or a persistent type, and
+linear data can only be used once in a program.
+The alternative is the ``usage'' perspective, where data is characterized by how
+often is used is a program, and that usage is reflected in the types. These two
+perspectives. These two presentations are equally expressive, and can be useful
+in different domains. While the ``kind'' perspective is the traditional
+presentation, and perhaps more natural in some cases, the ``usage'' perspective has
+the advantage of being easy to implement, so there is significantly more tool
+support for type systems built on this foundation. 
+
+In this work we present tools to make it easier to implement traditional
+``kind''-based linear type systems in Coq, using techniques that should extend
+to other proof environments as well.
+
+Consider a simple kind-based linear lambda calculus:
 \[
     \inferrule*
     {~}
     {x:τ ⊢ x : τ}
 \quad
     \inferrule*
-    {Γ ⋓ x:σ ⊢ e : τ}
+    {Γ ∙ x:σ ⊢ e : τ}
     {Γ ⊢ λx.e : σ ⊸ τ}
 \quad
     \inferrule*
     {Γ_1 ⊢ e_1 : σ ⊸ τ \\ Γ_2 ⊢ e_2 : σ}
-    {Γ_1 ⋓ Γ_2 ⊢ e_1 \; e_2 : τ}
+    {Γ_1 ∙ Γ_2 ⊢ e_1 \; e_2 : τ}
 \]
 
 There are a few important differences from the simply-typed lambda calculus,
@@ -172,7 +185,7 @@ duplicated.\footnote{We could also consider other substructural type systems,
 typing context must be exactly the singleton context $x:τ$; the corresponding
 STLC rule, where $Γ ⊢ x : τ$ provided $(x:τ) ∈ Γ$, might discard additional
 variables in $Γ$, contradicting linearity. Second, in the abstraction and
-application rules, we write $Γ_1 ⋓ Γ_2$ for the \emph{partial, disjoint merge}
+application rules, we write $Γ_1 ∙ Γ_2$ for the \emph{partial, disjoint merge}
 of $Γ_1$ and $Γ_2$, which is undefined if $Γ_1 ∩ Γ_2 ≠ ∅$. This ensures that
 linear variables cannot be duplicated to be used on both sides of an
 application, or shadowed in the abstraction rule.
@@ -196,7 +209,7 @@ application $e_1 \; e_2$, should it really matter if we type $e_1$ or $e_2$ firs
 On the whole, we would prefer a judgment in Coq corresponding to the natural
 presentation of linear types: $Γ ⊢ e : τ$, asserting that $e$ uses
 \emph{exactly} the variables in $Γ$. Our goal in this work is to define a linear
-typing judgment \coqe{Has_LType : Ctx -> Ty -> Prop} in Coq and be able to
+typing judgment \coqe{Has_LType : Ctx -> Tm -> Ty -> Prop} in Coq and be able to
 easily (automatically) discharge constraints stemming from the linearity of
 typing contexts. In addition, the technique should not rely on a particular
 representation of variable binding or typing contexts.
@@ -218,15 +231,15 @@ to write our disjoint merge operation.
 %\jennifer{I don't think this paragraph is super clear}
 
 Thus, we can define the linear typing judgment in Coq as follows:
-\robert{Is this in the Coq development? I couldn't find it. It looks like Has\_LType should have 3 arguments though: A context, a term and a type.}
+\todo{add to coq development}
 \begin{coq}
-Inductive Has_LType : Ctx -> Ty -> Prop :=
+Inductive Has_LType : Ctx -> Tm -> Ty -> Prop :=
 | L_Var : ∀ Γ x τ, Γ = singleton x τ ->
                    Has_LType Γ (Var x) τ
-| L_Abs : ∀ Γ x e σ, is_valid (Γ ⋓ singleton x σ) ->
-                     Has_LType (Γ ⋓ singleton x σ) e τ ->
+| L_Abs : ∀ Γ x e σ, is_valid (Γ ∙ singleton x σ) ->
+                     Has_LType (Γ ∙ singleton x σ) e τ ->
                      Has_LType Γ (Abs x e) (σ ⊸ τ)
-| L_App : ∀ Γ1 Γ2 Γ e1 e2 σ τ, Γ1 ⋓ Γ2 = Γ -> is_valid Γ ->
+| L_App : ∀ Γ1 Γ2 Γ e1 e2 σ τ, Γ1 ∙ Γ2 = Γ -> is_valid Γ ->
                                Has_LType Γ1 e1 (σ ⊸ τ) ->
                                Has_LType Γ2 e2 σ ->
                                Has_LType Γ (App e1 e2) τ.
@@ -241,9 +254,9 @@ as follows:
 \end{coq} 
 Applying the abstraction constructors in sequence, we obtain the following goals:
 \begin{coq}
-  1) is_valid (∅ ⋓ singleton x σ)
-  2) is_valid (∅ ⋓ singleton x σ ⋓ singleton y (σ ⊸ τ))
-  3) Has_LType (∅ ⋓ singleton x σ ⋓ singleton y (σ ⊸ τ)) 
+  1) is_valid (∅ ∙ singleton x σ)
+  2) is_valid (∅ ∙ singleton x σ ∙ singleton y (σ ⊸ τ))
+  3) Has_LType (∅ ∙ singleton x σ ∙ singleton y (σ ⊸ τ)) 
                (App (Var y) (Var x)) τ
 \end{coq}
 We discuss how to solve goals of the form \coqe{is_valid Γ} in
@@ -255,8 +268,8 @@ Coq's existential variables (\coqe{evars}) provide a solution here; we defer the
 instantiation of \coqe{Γ1} and \coqe{Γ2} to later, and use the tactic
 \coqe{eapply L_App}. This introduces four new goals:
 \begin{coq}
-  4) ?Γ1 ⋓ ?Γ2 = (∅ ⋓ singleton x σ ⋓ singleton y (σ ⊸ τ))
-  5) is_valid (∅ ⋓ singleton x σ ⋓ singleton y (σ ⊸ τ))
+  4) ?Γ1 ∙ ?Γ2 = (∅ ∙  singleton x σ ∙ singleton y (σ ⊸ τ))
+  5) is_valid (∅ ∙ singleton x σ ∙ singleton y (σ ⊸ τ))
   6) Has_LType ?Γ1 (Var y) (?σ0 ⊸ τ)
   7) Has_LType ?Γ2 (Var x) ?σ0
 \end{coq}
@@ -264,8 +277,8 @@ Clearly, goals 6 and 7 can be discharged using the \coqe{LVar} constructor,
 which resolves the \coqe{Evars} we introduced, and we are left with a revised
 goal 4: 
 \begin{coq}
-  4) singleton y (σ ⊸ τ) ⋓ singleton x σ 
-  = ∅ ⋓ singleton x σ ⋓ singleton y (σ ⊸ τ)
+  4) singleton y (σ ⊸ τ) ∙ singleton x σ 
+  = ∅ ∙ singleton x σ ∙ singleton y (σ ⊸ τ)
 \end{coq}
 
 The typing rules thus introduce two new kinds of constraints: showing that two
@@ -274,7 +287,10 @@ contexts are equal, and showing that a context is valid.
 \section{Equality of typing contexts}
 \label{sec:monoid}
 
-\robert{Using bottom but calling it zero seems confusing to me. Why not just use 0 and 1?}
+\robert{Using bottom but calling it zero seems confusing to me. Why not just use
+  0 and 1?}
+\jennifer{I'm worried about ∅ vs 1, but I think what you're suggesting is
+  probably better, just have to rename some things}
 The equality of typing contexts can be described as a partial commutative
 monoid---that is, a commutative monoid $(⊤,∙)$ along with a zero element $⊥$
 such that for all $a$, $a ∙ ⊥ = ⊥$. We characterize this structure as a type
@@ -355,7 +371,7 @@ contexts is valid if and only if their domains are disjoint. The \coqe{validate}
 tactic simply rewrites the target by these lemmas. For example, showing the
 validity of goal (4) above, that
 \begin{coq}
-    is_valid (∅ ⋓ singleton x σ ⋓ singleton y (σ ⊸ τ))
+    is_valid (∅ ∙ singleton x σ ∙ singleton y (σ ⊸ τ))
 \end{coq}
 reduces to showing that \coqe{x ≠? y = true}, which we can conclude from the
 hypothesis that \coqe{x ≠ y}.
