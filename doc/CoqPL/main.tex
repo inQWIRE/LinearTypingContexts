@@ -289,7 +289,7 @@ contexts are equal, and showing that a context is valid.
 
 \robert{Using bottom but calling it zero seems confusing to me. Why not just use
   0 and 1?}
-\jennifer{I'm worried about ∅ vs 1, but I think what you're suggesting is
+\jennifer{I'm worried about ∅ vs 0, but I think what you're suggesting is
   probably better, just have to rename some things}
 The equality of typing contexts can be described as a partial commutative
 monoid---that is, a commutative monoid $(⊤,∙)$ along with a zero element $⊥$
@@ -349,9 +349,9 @@ function \coqe{validity Γ}, and define \coqe{is_valid Γ} to be %
 behavior of validity with respect to the element of the partial monoid.
 \begin{coq}
 Class TypingContext (X A Ctx : Type) :=
-  { singleton : X -> A -> Ctx
-  ; validity : Ctx -> bool }.
-Class TypingContext_Laws X A Ctx `{PCM_Ctx : PCM_Laws Ctx} `{TypingContext X A} :=
+  { singleton : X -> A -> Ctx; validity : Ctx -> bool }.
+Class TypingContext_Laws X A Ctx `{PCM_Ctx : PCM_Laws Ctx} 
+                                 `{TypingContext X A} :=
   { validity3 : forall Γ1 Γ2 Γ3, 
     validity (Γ1 ∙ Γ2 ∙ Γ3) =  validity (Γ1 ∙ Γ2) 
                             && validity (Γ1 ∙ Γ3) 
