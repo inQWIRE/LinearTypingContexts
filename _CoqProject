@@ -1,6 +1,6 @@
 -R . LinearTypingContexts
-COQC = hoqc
-COQDEP = hoqdep
+COQC = /home/jennifer/research/HoTT/hoqc
+COQDEP = /home/jennifer/research/HoTT/hoqdep
 Monad.v
 List.v
 Multiset.v
