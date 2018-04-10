@@ -34,5 +34,4 @@ The tactic `validate` solves goals of the form `is_valid Γ`. It is based on the
 
 
 We give the following instantiation of the `TypingContext` type class:
-  - `IndexContext.v`: Contexts are `list (option T)` where variables are natural
-    numbers that index into a list
+  - `SetContext.v`: Contexts are lists quotiented by permutations of the list.
