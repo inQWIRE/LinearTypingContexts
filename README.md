@@ -1,30 +1,38 @@
 This repository contains a framework for reasoning about linear typing contexts
-in Coq. The file `NCM.v` describes the algebraic structure of typing contexts.
-This is characterized by the following parts.
+in Coq. 
 
-- A type of typing contexts "A"
-- An empty context, written "1 : A"
-- A context merge operation, written "Γ1 · Γ2"
-- To account for the fact that merge is partial, an undefined context "0 : A"
-- A subset "B ⊂ A" of non-empty contexts
+The file `Monoid.v` describes the algebraic structure of partial commutative
+monoids, which are characterized by the following parts:
 
-These components satisfy the following properties:
-- (A,1,·) forms a commutative monoid
-- 0 absorbes all elements of A, so a · 0 = 0
-- all non-empty contexts are nilpotent: b ∈ B implies b · b = 0
+- A base type "A"
+- A unit element "⊤ : A"
+- An undefined element "⊥ : A"
+- A merge operation, written "a ∙ b"
 
-The file `NCM.v` gives these properties, which we call *nilpotent commutative
-monoids* as a type class. We define proof tactics to solve goals of the form "Γ1
-= Γ2", including when one of the contexts are undefined. The highest-level
-tactic is `reification`.
+Partial commutative monoids satisfy the following laws:
 
-TODO: rename tactic
+- (A,⊤,∙) forms a commutative monoid
+- a ∙ ⊥ = ⊥
 
-TODO: goals of the form Γ <> 0.
+The tactic `monoid` solves goals of the form `a = b`, where `a` and `b` are made up of PCM constructors and at most one EVar.
 
-We give a few instantiation of the NCM type class:
+The file `TypingContext.v` describes additional structure on top of PCM's. A typing context "Ctx" with domain "X" and image "A" satisfies:
+
+- `Ctx` is a partial commutative monoid
+- for `x:X` and `a:A`, a singleton context `singleton x a : Ctx`
+- for any context `Γ:Ctx`, a predicate `is_valid Γ` that checks if Γ is the
+  undefined element ⊥.
+  
+The tactic `validate` solves goals of the form `is_valid Γ`. It is based on the following principles:
+ 
+- (Γ₁ ∙ Γ₂ ∙ Γ₃) is valid if and only if all of (Γ₁ ∙ Γ₂), (Γ₁ ∙ Γ₃), and (Γ₂ ∙
+  Γ₃) are valid.
+- ⊤ is valid
+- the singleton context (x,a) is valid
+- for two singletons (x,a) and (y,b), the context `singleton x a ∙ singleton y
+  b` is valid if and only if `x <> y`.
+
+
+We give the following instantiation of the `TypingContext` type class:
   - `IndexContext.v`: Contexts are `list (option T)` where variables are natural
     numbers that index into a list
-  - `ListContext.v`: Contexts are `list (nat * T)` where variables of type
-    `nat` (could be any ordered type) and are sorted by the variable, so merge
-    is deterministic. (TODO: fill in undefineds in this file)
