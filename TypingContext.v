@@ -1,5 +1,7 @@
 Require Import Monad.
 Require Import Monoid.
+Require Import Coq.Classes.EquivDec.
+
 
 Class TypingContext (X A Ctx : Type) :=
   { singleton : X -> A -> Ctx
@@ -23,65 +25,26 @@ Instance PTypingCtx_to_TypingCtx X A PCtx `{PTypingContext X A PCtx}
 
 Open Scope bool_scope.
 
-Class DecidablePaths X := {decPaths : forall (x y : X), {x = y} + {x <> y}}.
+Section bdec.
+
+  Context X `{EqDec X eq}.
+
+Lemma eq_bdec_true : forall x y, x = y -> x ==b y = true.
+Proof. intros; cbv. destruct (H x y); congruence. Qed.
+
+Lemma neq_bdec_false : forall x y, x <> y -> x ==b y = false.
+Proof. intros; cbv. destruct (H x y); congruence. Qed.
+
+Lemma eq_bdec_false : forall x y, x = y -> x <>b y = false.
+Proof. intros; cbv. destruct (H x y); congruence. Qed.
+
+Lemma neq_bdec_true : forall x y, x <> y -> x <>b y = true.
+Proof. intros; cbv. destruct (H x y); congruence. Qed.
+
+End bdec.
 
 
-  Definition bdec {X} `{DecidablePaths X} (x y : X) : bool :=
-    if decPaths x y then true else false.
-  Infix "=?" := bdec (at level 25).
-  Notation "x <>? y" := (negb (x =? y)) (at level 25).
-
-Section DecidablePaths.
-  Context X `{DecidablePaths X}.
-
-  Lemma bdec_eq : forall x y, x =? y = true <-> x = y.
-  Proof.
-    intros.
-    unfold bdec. 
-    destruct (decPaths x y) eqn:decX.
-    - split; auto.
-    - split; auto. intros. absurd (false = true); auto.
-  Qed.
-
-  Lemma bdec_neq : forall x y, x <>? y = true <-> x <> y.
-  Proof.
-    intros.
-    unfold bdec.
-    destruct (decPaths x y) eqn:decX.
-    - split; intros; auto. inversion H0. 
-    - split; auto.
-  Qed.
-
-  Lemma bdec_eq' : forall x, x =? x = true.
-  Proof.
-    intros x. apply bdec_eq. auto.
-  Qed.
-
-  Lemma eq_bdec_true : forall x y, x = y -> x =? y = true.
-  Proof. intros. apply bdec_eq. auto. Qed.
-  Lemma neq_bdec_false : forall x y, x <> y -> x =? y = false.
-  Proof. intros. apply Bool.negb_true_iff.
-                 apply bdec_neq. auto.
-  Qed.
-  Lemma eq_bdec_false : forall x y, x = y -> x <>? y = false.
-  Proof.
-    intros.
-    apply Bool.negb_true_iff.
-    rewrite Bool.negb_involutive.
-    apply bdec_eq. auto.
-  Qed.
-  Lemma neq_bdec_true : forall x y, x <> y -> x =? y = false.
-  Proof.
-    intros.
-    apply Bool.negb_true_iff.
-    apply bdec_neq. auto.
-  Qed.
-
-
-
-End DecidablePaths.
-
-Class TypingContext_Laws X A Ctx `{DecidablePaths X} 
+Class TypingContext_Laws X A Ctx `{EqDec X eq} 
                                  `{PCM_Ctx : PCM_Laws Ctx} 
                                  `{TypingContext X A Ctx} :=
   { validity3 : forall Γ1 Γ2 Γ3, 
@@ -92,10 +55,10 @@ Class TypingContext_Laws X A Ctx `{DecidablePaths X}
   ; validity_singleton : forall x a, validity (singleton x a) = true
   ; validity_top : validity ⊤ = true
   ; validity_singleton_merge : forall x y a b, 
-    validity (singleton x a ∙ singleton y b) = (x <>? y)
+    validity (singleton x a ∙ singleton y b) = (x <>b y)
   }. 
 
-Class PTypingContext_Laws X A Ctx `{DecidablePaths X}
+Class PTypingContext_Laws X A Ctx `{EqDec X eq}
                                   `{PPCM_Ctx : PPCM_Laws Ctx}
                                   `{PTypingContext X A Ctx} :=
   { pvalidity3 : forall Γ1 Γ2 Γ3,
@@ -121,10 +84,11 @@ Proof.
     * simpl. split; auto.
   - intros; simpl; auto.
   - simpl; auto.
-  - intros. simpl. unfold bdec.
-    destruct (decPaths x y) as [eq | neq]; auto.
-    * apply (validity_singleton_merge' x y a b) in eq.
-      rewrite eq. auto.
+  - intros. simpl. 
+    unfold nequiv_decb, equiv_decb, equiv_dec. 
+    destruct (H x y) as [e | ne]; auto.
+    * apply (validity_singleton_merge' x y a b) in e.
+      rewrite e.  auto.
     * destruct (m' (singleton' x a) (singleton' y b)) as [ | z] eqn:eq'; auto.
       apply (validity_singleton_merge') in eq'. contradiction.
 Qed.
@@ -178,7 +142,7 @@ Lemma singleton_merge_is_valid : forall x y a b,
 Proof.
   intros. unfold is_valid.
   rewrite validity_singleton_merge.
-  split; apply bdec_neq.
+  cbv. destruct (H x y); split; congruence. 
 Qed.
 
 Lemma singleton_merge_invalid : forall x a b,
@@ -186,7 +150,7 @@ Lemma singleton_merge_invalid : forall x a b,
 Proof.
   intros. unfold is_valid.
   rewrite validity_singleton_merge. 
-  rewrite bdec_eq'. simpl. auto.
+  cbv. destruct (H x x); congruence.
 Qed.
 
 End TypingContexts.
@@ -237,8 +201,6 @@ Ltac introduce_valid_term Γ :=
                        let Γ' := fresh "Γ" in
                        remember Γ as Γ'
   end; subst.
-Search (?x =? ?y).
-
 
 (*
 Ltac validate :=
@@ -252,25 +214,23 @@ Ltac validate :=
 
 Ltac eq_to_beq :=
   repeat match goal with
-  | [H : ?x = ?y |- context[?x =? ?y] ] => 
+  | [H : ?x = ?y |- context[?x ==b ?y] ] => 
     rewrite (eq_bdec_true _ x y H)
-  | [H : ?x = ?y |- context[?y =? ?x] ] => 
+  | [H : ?x = ?y |- context[?y ==b ?x] ] => 
     rewrite (eq_bdec_true _ y x (eq_sym H))
-  | [H : ?x = ?y |- context[?x <>? ?y] ] => 
+  | [H : ?x = ?y |- context[?x <>b ?y] ] => 
     rewrite (eq_bdec_false _ x y H)
-  | [H : ?x = ?y |- context[?y <>? ?x] ] =>
+  | [H : ?x = ?y |- context[?y <>b ?x] ] =>
     rewrite (eq_bdec_false _ y x (eq_sym H))
-
-  | [H : ?x <> ?y |- context[?x <>? ?y] ] =>
+  | [H : ?x <> ?y |- context[?x <>b ?y] ] =>
     rewrite (neq_bdec_true _ x y H)
-  | [H : ?x <> ?y |- context[?y <>? ?x] ] =>
+  | [H : ?x <> ?y |- context[?y <>b ?x] ] =>
     rewrite (neq_bdec_true _ y x (not_eq_sym H))
-  | [ H : ?x <> ?y |- context[?x =? ?y] ] =>
+  | [ H : ?x <> ?y |- context[?x ==b ?y] ] =>
     rewrite (neq_bdec_false _ x y H)
-  | [ H : ?x <> ?y |- context[?y =? ?x] ] =>
+  | [ H : ?x <> ?y |- context[?y ==b ?x] ] =>
     rewrite (neq_bdec_false _ y x (not_eq_sym H))
   end.
-
 
 Ltac validate :=
   intros;

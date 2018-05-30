@@ -179,12 +179,6 @@ Hint Resolve Monoid_IdxMap_Laws.
 Instance PTypingContext_IdxMap A : PTypingContext nat A (IdxMap A) :=
   { singleton' := @singleton' A
   }.
-Instance DecidablePaths_nat : DecidablePaths nat.
-Proof.
-  split.
-  induction x as [ | x]; destruct y as [ | y]; auto.
-  destruct (IHx y); auto.
-Qed.
 
 Ltac unfold_m' :=
   repeat match goal with
